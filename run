@@ -1,0 +1,32 @@
+P3=
+if [ -f `which python3` ]; then
+  P3=3
+fi
+
+if [ $1 = "install" ]; then
+  python${P3} -m venv venv
+  . ./venv/bin/activate
+  pip install --upgrade pip || echo "Please first sudo apt install python${P3}-pip"
+  pip install --upgrade setuptools
+  pip install --upgrade -r requirements.txt
+  exit 0
+fi
+
+if [ ! -f "venv/bin/activate" ]; then
+  ./run install
+fi
+
+. ./venv/bin/activate || exit -1
+
+if [ $1 = "server" ]; then
+  export FLASK_APP=server.py
+  flask run
+elif [ $1 = "local" ]; then
+  python local.py "$@"
+elif [ $1 = "test" ]; then
+  nosetests tests/
+elif [ $1 = "lint" ]; then
+  pycodestyle
+else
+  "$@"
+fi
