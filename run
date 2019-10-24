@@ -1,3 +1,5 @@
+#!/bin/bash
+
 P3=
 if [ -f `which python3` ]; then
   P3=3
