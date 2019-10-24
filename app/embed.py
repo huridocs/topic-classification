@@ -26,7 +26,6 @@ class Embedder:
         if len(tokens) > MAX_SEQ_LENGTH - 2:
             tokens = tokens[:(MAX_SEQ_LENGTH - 2)]
         tokens = ["[CLS]"] + tokens + ["[SEP]"]
-        print(tokens)
         segment_ids = [0] * len(tokens)
         input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
 
@@ -52,10 +51,6 @@ class Embedder:
 
         seq_output = bert_outputs["sequence_output"]
 
-        # Set output vectors to 0 if mask is 0
-        seq_output = seq_output * \
-            tf.cast(tf.expand_dims(tf.expand_dims(input_mask, 0), 2), tf.float32)
-
         with tf.Session() as sess:
             sess.run([tf.global_variables_initializer(), tf.tables_initializer()])
-            return sess.run(seq_output)[0]
+            return sess.run(seq_output)[0][0:len(tokens)]

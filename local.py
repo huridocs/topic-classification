@@ -2,7 +2,6 @@ import os
 from app import embed
 from absl import app
 from absl import flags
-import zlib
 import tensorflow_hub as hub
 
 FLAGS = flags.FLAGS
@@ -16,6 +15,7 @@ def main(argv):
     if FLAGS.mode == "embed":
         e = embed.Embedder(FLAGS.bert)
         print(e.embed(FLAGS.seq))
+        print(len(e.embed(FLAGS.seq).tostring()))
 
 
 if __name__ == '__main__':
