@@ -1,6 +1,6 @@
 # Prod:
 flask
-ipython
+python-dotenv
 tensorflow==1.15.0
 tensorflow-gpu==1.15.0
 tensorflow-hub
@@ -13,3 +13,4 @@ setuptools
 pycodestyle
 autopep8
 nose
+ipython
