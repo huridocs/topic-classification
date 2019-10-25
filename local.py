@@ -1,3 +1,5 @@
+"local.py is a way to test the app's functionality without starting a server, not used in prod."
+
 import os
 from app import embed
 from absl import app
@@ -6,7 +8,8 @@ import tensorflow_hub as hub
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string("bert", "https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1", "The bert model to use")
+flags.DEFINE_string(
+    "bert", "https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1", "The bert model to use")
 flags.DEFINE_string("seq", "", "The sequence to handle")
 flags.DEFINE_enum("mode", "embed", ["embed"], "The operation to perform.")
 
