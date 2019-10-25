@@ -1,0 +1,16 @@
+# Prod:
+flask
+python-dotenv
+tensorflow==1.15.0
+tensorflow-gpu==1.15.0
+tensorflow-hub
+numpy
+bert-tensorflow
+
+# Dev:
+pip
+setuptools
+pycodestyle
+autopep8
+nose
+ipython

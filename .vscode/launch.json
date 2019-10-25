@@ -1,0 +1,30 @@
+{
+  "version": "0.2.0",
+  "configurations": [
+    {
+      "name": "flask-debug",
+      "type": "python",
+      "request": "launch",
+      "module": "flask",
+      "args": ["run", "--no-debugger", "--no-reload"],
+      "env": {
+        "FLASK_APP": "server.py",
+        "FLASK_ENV": "development",
+        "FLASK_DEBUG": "0"
+      },
+      "jinja": true
+    },
+    {
+      "name": "test-this-file",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/venv/bin/nosetests",
+      "args": ["${file}"],
+      "env": {
+        "FLASK_ENV": "development"
+      },
+      "console": "integratedTerminal",
+      "internalConsoleOptions": "neverOpen"
+    }
+  ]
+}
