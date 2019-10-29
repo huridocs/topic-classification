@@ -1,0 +1,27 @@
+
+### POST
+POST http://localhost:5000/task HTTP/1.1
+content-type: application/json
+
+{
+    "provider": "Wait",
+    "name": "wait_100",
+    "time": 2.0
+}
+
+### GET
+GET http://localhost:5000/task HTTP/1.1
+content-type: application/json
+
+{
+    "name": "wait_100"
+}
+
+
+### DELETE
+DELETE http://localhost:5000/task HTTP/1.1
+content-type: application/json
+
+{
+    "name": "wait_100"
+}
