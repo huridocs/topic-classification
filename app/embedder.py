@@ -1,11 +1,9 @@
-from __future__ import absolute_import
-from __future__ import division
-from __future__ import print_function
-
 from bert import tokenization
 import tensorflow as tf
 import tensorflow_hub as hub
 
+# Used for making sure all sentences end up
+# padded to equivalent vector lengths.
 MAX_SEQ_LENGTH = 256
 
 
@@ -16,6 +14,7 @@ class Embedder:
         tokenization_info = self.bert(
             signature="tokenization_info", as_dict=True)
         with tf.Session() as sess:
+            # vocab_file is a BERT-global, stable mapping {tokens: ids}
             vocab_file, do_lower_case = sess.run([tokenization_info["vocab_file"],
                                                   tokenization_info["do_lower_case"]])
         self.tokenizer = tokenization.FullTokenizer(
@@ -25,19 +24,28 @@ class Embedder:
         tokens = self.tokenizer.tokenize(seq)
         if len(tokens) > MAX_SEQ_LENGTH - 2:
             tokens = tokens[:(MAX_SEQ_LENGTH - 2)]
+
+        # CLS and SEP is a relic of multi-sentence pre-training
         tokens = ["[CLS]"] + tokens + ["[SEP]"]
+
+        # segment_ids refers again to multi-sentence pre-training
+        # TODO: maybe scrap
         segment_ids = [0] * len(tokens)
+
+        # per word, get IDs from vocab file
+        # e.g. [980234, 8792450, 132, 5002]
         input_ids = self.tokenizer.convert_tokens_to_ids(tokens)
 
         # The mask has 1 for real tokens and 0 for padding tokens. Only real
         # tokens are attended to.
+        # e.g. [1, 1, 1, 1]
         input_mask = [1] * len(input_ids)
 
         # Zero-pad up to the sequence length.
-        padding = [0] * (MAX_SEQ_LENGTH - len(input_ids))
-        input_ids += padding
-        input_mask += padding
-        segment_ids += padding
+        padding = [0] * (MAX_SEQ_LENGTH - len(input_ids))  # [0, 0, 0, ...]
+        input_ids += padding  # [980234, 8792450, 132, 5002, 0, 0, 0, ...]
+        input_mask += padding  # [1, 1, 1, 1, 0, ...]
+        segment_ids += padding  # [0, 0, 0, ...]
 
         assert len(input_ids) == MAX_SEQ_LENGTH
         assert len(input_mask) == MAX_SEQ_LENGTH
@@ -53,4 +61,8 @@ class Embedder:
 
         with tf.Session() as sess:
             sess.run([tf.global_variables_initializer(), tf.tables_initializer()])
-            return sess.run(seq_output)[0][0:len(tokens)]
+            out = sess.run(seq_output)[0][0:len(tokens)]
+            print("\n")
+            print(out)
+            print("\n")
+            return out
