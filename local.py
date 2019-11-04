@@ -17,8 +17,8 @@ flags.DEFINE_enum("mode", "embed", ["embed", "classify"], "The operation to perf
 def main(argv):
     if FLAGS.mode == "embed":
         e = embedder.Embedder(FLAGS.bert)
-        print(e.embed(FLAGS.seq))
-        print(len(e.embed(FLAGS.seq).tostring()))
+        m = e.GetEmbedding(FLAGS.seq)
+        print(len(m.tostring()))
     elif FLAGS.mode == "classify":
         print("It's classified.")
         pass

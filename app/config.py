@@ -1,6 +1,5 @@
-"""This configuration is read at Flask initialization,
-and conditioned on the FLASK_ENV environment variable
-(usually configured in ../.flaskenv)."""
+"""This configuration is read at Flask initialization, and conditioned on the
+FLASK_ENV environment variable (usually configured in ../.flaskenv)."""
 
 
 class Config(object):
@@ -14,7 +13,7 @@ class ProductionConfig(Config):
 
 class DevelopmentConfig(Config):
     DATABASE_URI = 'mongodb://local'
-    DEBUG = False
+    DEBUG = True
 
 
 class TestConfig(Config):

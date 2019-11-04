@@ -12,12 +12,11 @@ CONFIG = {
     "default": "app.config.DevelopmentConfig",
 }
 
-app = Flask(__name__,)
+app = Flask(__name__)
 
 # initialize configuration values
-app.logger.debug("Reading configuration...")
 config_name = os.getenv("FLASK_ENV", 'default')
-app.logger.debug("FLASK_ENV is " + config_name)
+app.logger.debug("Reading " + config_name + " configuration...")
 
 config_obj = CONFIG[config_name]
 app.logger.debug("config obj: " + config_obj)
@@ -25,7 +24,7 @@ app.config.from_object(config_obj)
 
 if app.config.from_pyfile('config.py'):
     app.logger.info("Successfully read instance configuration file.")
-app.logger.info("Flask config variables:")
+app.logger.info("Flask config:")
 app.logger.info(app.config.items())
 
 from app import routes  # nopep8
