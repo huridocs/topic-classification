@@ -38,7 +38,7 @@ class Embedder:
         self.tf_hub = hub.Module(bert, trainable=True)
 
         t_info = self.tf_hub(signature="tokenization_info", as_dict=True)
-        with tf.Session() as sess:
+        with tf.compat.v1.Session() as sess:
             # vocab_file is a BERT-global, stable mapping {tokens: ids}
             vocab_file, do_lower_case = sess.run(
                 [t_info["vocab_file"],
@@ -48,36 +48,26 @@ class Embedder:
                 do_lower_case=do_lower_case)
 
     def GetEmbedding(self, seq: str):
-        # fetch from MongoDB
+        # fetch from cache
         obj = Embedding.m.get(bert=self.bert, seq=seq)
-        # if DNE, create and store in MongoDB
-        if not obj:
-            logging.info("Embedding matrix for bert=%s, seq=%s "
-                         "not found in cache. Generating..." %
-                         (self.bert, seq))
-            matrix = self.embed(seq)
-            print(type(matrix))
-            print(type(matrix[0]))
-            print(type(matrix[0][0]))
-            # convert numpyArray to list
-            l_matrix = matrix.tolist()
-            print(type(l_matrix))
-            print(type(l_matrix[0]))
-            print(type(l_matrix[0][0]))
-
-            e = Embedding.make(
-                dict(bert=self.bert, seq=seq, embedding=l_matrix))
-            e.m.save()
-            logging.info("Embedding matrix stored in MongoDB.")
+        if obj:
+            logging.info("Using embedding matrix fetched from MongoDB...")
+            # convert list back to numpyArray
+            matrix = numpy.array(obj.embedding)
+            logging.debug(matrix)
             return matrix
 
-        logging.info("Using embedding matrix fetched from MongoDB...")
-        # convert list back to numpyArray
-        matrix = numpy.array(obj.embedding)
-        print(type(matrix))
-        print(type(matrix[0]))
-        print(type(matrix[0][0]))
-        logging.debug(matrix)
+        logging.info("Embedding matrix for bert=%s, seq=%s "
+                        "not found in cache. Generating..." %
+                        (self.bert, seq))
+        matrix = self.embed(seq)
+
+        # convert numpyArray to list for storage in MongoDB
+        l_matrix = matrix.tolist()
+        e = Embedding.make(
+            dict(bert=self.bert, seq=seq, embedding=l_matrix))
+        e.m.save()
+        logging.info("Embedding matrix stored in MongoDB.")
         return matrix
 
     def embed(self, seq: str):
@@ -114,12 +104,14 @@ class Embedder:
         bert_inputs = dict(input_ids=tf.expand_dims(input_ids, 0),
                            input_mask=tf.expand_dims(input_mask, 0),
                            segment_ids=tf.expand_dims(segment_ids, 0))
-        bert_outputs = self.tf_hub(inputs=bert_inputs, signature="tokens",
-                                 as_dict=True)
+        bert_outputs = self.tf_hub(
+            inputs=bert_inputs, signature="tokens", as_dict=True)
 
         seq_output = bert_outputs["sequence_output"]
 
-        with tf.Session() as sess:
-            sess.run([tf.global_variables_initializer(), tf.tables_initializer()])
+        with tf.compat.v1.Session() as sess:
+            sess.run([
+                tf.compat.v1.global_variables_initializer(),
+                tf.compat.v1.tables_initializer()])
             out = sess.run(seq_output)[0][0:len(tokens)]
             return out
