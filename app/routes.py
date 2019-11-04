@@ -24,8 +24,17 @@ def classify():
     return "Classification goes here"
 
 
+@app.route('/embed', methods=['POST'])
+def make_embed():
+    # request.args: {'bert': 'bert_uncased_L-12_H-768_A-12/1'}
+    error = None
+    e = embedder.Embedder(request.form['bert'])
+    matrix = e.GetEmbedding(request.form['seq'])
+    return str(len(matrix))
+
+
 @app.route('/embed/<uuid:id>', methods=['GET'])
-def embed():
+def fetch_embed(id):
     e = embedder.Embedder()
     e.embed()
     return "Embedding goes here"

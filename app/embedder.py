@@ -58,9 +58,9 @@ class Embedder:
             return matrix
 
         logging.info("Embedding matrix for bert=%s, seq=%s "
-                        "not found in cache. Generating..." %
-                        (self.bert, seq))
-        matrix = self.embed(seq)
+                     "not found in cache. Generating..." %
+                     (self.bert, seq))
+        matrix = self.buildEmbedding(seq)
 
         # convert numpyArray to list for storage in MongoDB
         l_matrix = matrix.tolist()
@@ -70,7 +70,7 @@ class Embedder:
         logging.info("Embedding matrix stored in MongoDB.")
         return matrix
 
-    def embed(self, seq: str):
+    def buildEmbedding(self, seq: str):
         tokens = self.tokenizer.tokenize(seq)
         if len(tokens) > MAX_SEQ_LENGTH - 2:
             tokens = tokens[:(MAX_SEQ_LENGTH - 2)]

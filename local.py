@@ -27,3 +27,4 @@ def main(argv):
 if __name__ == '__main__':
     os.environ['TFHUB_CACHE_DIR'] = os.getcwd() + "/bert_models"
     app.run(main)
+buildEmbedding
