@@ -36,6 +36,7 @@ class Embedder:
     def __init__(self, bert: str):
         self.bert = bert
         self.tf_hub = hub.Module(bert, trainable=True)
+        self.logger = logging.getLogger("app.logger")
 
         t_info = self.tf_hub(signature="tokenization_info", as_dict=True)
         with tf.compat.v1.Session() as sess:
@@ -51,26 +52,26 @@ class Embedder:
         # fetch from cache
         obj = Embedding.m.get(bert=self.bert, seq=seq)
         if obj:
-            logging.info("Using embedding matrix fetched from MongoDB...")
+            self.logger.info("Using embedding matrix fetched from MongoDB...")
             # convert list back to numpyArray
             matrix = numpy.array(obj.embedding)
-            logging.debug(matrix)
+            self.logger.debug(matrix)
             return matrix
 
-        logging.info("Embedding matrix for bert=%s, seq=%s "
-                     "not found in cache. Generating..." %
-                     (self.bert, seq))
-        matrix = self.buildEmbedding(seq)
+        self.logger.info("Embedding matrix for bert=%s, seq=%s "
+                         "not found in cache. Generating..." %
+                         (self.bert, seq))
+        matrix = self._buildEmbedding(seq)
 
         # convert numpyArray to list for storage in MongoDB
         l_matrix = matrix.tolist()
         e = Embedding.make(
             dict(bert=self.bert, seq=seq, embedding=l_matrix))
         e.m.save()
-        logging.info("Embedding matrix stored in MongoDB.")
+        self.logger.info("Embedding matrix stored in MongoDB.")
         return matrix
 
-    def buildEmbedding(self, seq: str):
+    def _buildEmbedding(self, seq: str):
         tokens = self.tokenizer.tokenize(seq)
         if len(tokens) > MAX_SEQ_LENGTH - 2:
             tokens = tokens[:(MAX_SEQ_LENGTH - 2)]

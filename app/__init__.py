@@ -1,6 +1,7 @@
+import logging
 import os
 
-from flask import Flask
+from flask import Flask, current_app
 
 from app import config
 
@@ -26,6 +27,10 @@ if app.config.from_pyfile('config.py'):
     app.logger.info("Successfully read instance configuration file.")
 app.logger.info("Flask config:")
 app.logger.info(app.config.items())
+
+# configure logging
+if not app.debug:
+    app.logger.setLevel(logging.INFO)
 
 from app import routes  # nopep8
 from app import task_routes  # nopep8

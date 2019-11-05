@@ -36,5 +36,5 @@ def make_embed():
 @app.route('/embed/<uuid:id>', methods=['GET'])
 def fetch_embed(id):
     e = embedder.Embedder()
-    e.embed()
+    e._buildEmbedding()
     return "Embedding goes here"
