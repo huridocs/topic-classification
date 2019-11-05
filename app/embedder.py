@@ -14,7 +14,8 @@ import tensorflow_hub as hub
 # padded to equivalent vector lengths.
 MAX_SEQ_LENGTH = 256
 
-bind = create_datastore('tutorial')
+# TODO: Parameterize the MongoDB session for testing.
+bind = create_datastore('classifier_dev')
 session = Session(bind)
 
 
@@ -51,17 +52,19 @@ class Embedder:
     def GetEmbedding(self, seq: str):
         # fetch from cache
         obj = Embedding.m.get(bert=self.bert, seq=seq)
-        if obj:
+        # TODO: put this back to being if obj
+        if False:
             self.logger.info("Using embedding matrix fetched from MongoDB...")
             # convert list back to numpyArray
             matrix = numpy.array(obj.embedding)
             self.logger.debug(matrix)
-            return matrix
+            #return matrix
+            return matrix, _
 
         self.logger.info("Embedding matrix for bert=%s, seq=%s "
                          "not found in cache. Generating..." %
                          (self.bert, seq))
-        matrix = self._buildEmbedding(seq)
+        matrix, seq_length = self._buildEmbedding(seq)
 
         # convert numpyArray to list for storage in MongoDB
         l_matrix = matrix.tolist()
@@ -69,9 +72,9 @@ class Embedder:
             dict(bert=self.bert, seq=seq, embedding=l_matrix))
         e.m.save()
         self.logger.info("Embedding matrix stored in MongoDB.")
-        return matrix
+        return matrix, seq_length
 
-    def _buildEmbedding(self, seq: str):
+    def _buildEmbedding(self, seq: str) -> (numpy.array, int):
         tokens = self.tokenizer.tokenize(seq)
         if len(tokens) > MAX_SEQ_LENGTH - 2:
             tokens = tokens[:(MAX_SEQ_LENGTH - 2)]
@@ -114,5 +117,5 @@ class Embedder:
             sess.run([
                 tf.compat.v1.global_variables_initializer(),
                 tf.compat.v1.tables_initializer()])
-            out = sess.run(seq_output)[0][0:len(tokens)]
-            return out
+            out = sess.run(seq_output)[0]
+            return out, len(tokens)
