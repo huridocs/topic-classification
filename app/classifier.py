@@ -1,4 +1,6 @@
+from operator import itemgetter
 import logging
+import string
 import time
 import os
 import numpy as np
@@ -11,12 +13,17 @@ MAX_SEQ_LENGTH = 256
 
 class Classifier:
 
-    def __init__(self, bert_classifier: (str, str)):
+    def __init__(self, bert_classifier: (str, str), vocab: str):
+        self.logger = logging.getLogger('app.logger')
         self.bert = bert_classifier[0]
         self.classifier = bert_classifier[1]
+        self.vocab = self.fetchVocab(vocab)
         self.embedder = embedder.Embedder(self.bert)
         self.predictor = tf.contrib.predictor.from_saved_model(self.classifier)
-        self.logger = logging.getLogger('app.logger')
+
+    def fetchVocab(self, vocab: str):
+        with open(vocab, 'r') as f:
+            return f.readlines()
 
     def classify(self, seq: str):
         # calculate UID of seqs
@@ -38,9 +45,19 @@ class Classifier:
         predictions = self.predictor(features)
 
         # filter results
-        # map results back to topic strings, according to classifier metadata
-        # return topic confidence array
-        out = predictions["probabilities"][0]
-        self.logger.debug(out)
+        probs = predictions["probabilities"][0]
+        self.logger.debug(probs)
 
+        # map results back to topic strings, according to classifier metadata
+        out = list(zip((t.rstrip() for t in self.vocab), probs))
+        self.logger.info("============UNSORTED==============")
+        for topic in out:
+            self.logger.info(topic)
+
+        out.sort(key=itemgetter(1), reverse=True)
+        self.logger.info("==============SORTED==============")
+        for topic in out:
+            self.logger.info(topic)
+
+        # return topic confidence array
         return out

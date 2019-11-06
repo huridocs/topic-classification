@@ -30,6 +30,7 @@ class Embedding(Document):
     bert = Field(schema.String)
     seq = Field(schema.String)
     embedding = Field(schema.Array(schema.Array(schema.Float)))
+    seq_length = Field(schema.Int)
     update_timestamp = Field(datetime, if_missing=datetime.utcnow)
 
 
@@ -52,14 +53,13 @@ class Embedder:
     def GetEmbedding(self, seq: str):
         # fetch from cache
         obj = Embedding.m.get(bert=self.bert, seq=seq)
-        # TODO: put this back to being if obj
-        if False:
+        if obj and obj.seq_length:
             self.logger.info("Using embedding matrix fetched from MongoDB...")
             # convert list back to numpyArray
             matrix = numpy.array(obj.embedding)
             self.logger.debug(matrix)
-            #return matrix
-            return matrix, _
+            # return matrix
+            return matrix, obj.seq_length
 
         self.logger.info("Embedding matrix for bert=%s, seq=%s "
                          "not found in cache. Generating..." %
@@ -68,8 +68,8 @@ class Embedder:
 
         # convert numpyArray to list for storage in MongoDB
         l_matrix = matrix.tolist()
-        e = Embedding.make(
-            dict(bert=self.bert, seq=seq, embedding=l_matrix))
+        e = Embedding.make(dict(
+            bert=self.bert, seq=seq, embedding=l_matrix, seq_length=seq_length))
         e.m.save()
         self.logger.info("Embedding matrix stored in MongoDB.")
         return matrix, seq_length
