@@ -24,13 +24,12 @@ class Embedding(Document):
 
     class __mongometa__:
         session = session
-        name = 'embedding_matrix'
+        name = 'embedding_cache'
 
     _id = Field(schema.ObjectId)
     bert = Field(schema.String)
     seq = Field(schema.String)
     embedding = Field(schema.Array(schema.Array(schema.Float)))
-    seq_length = Field(schema.Int)
     update_timestamp = Field(datetime, if_missing=datetime.utcnow)
 
 

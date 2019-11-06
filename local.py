@@ -18,9 +18,9 @@ flags.DEFINE_string(
 flags.DEFINE_string(
     "classifier", CLASSIFIER_DIR, "The classifier model to use.")
 flags.DEFINE_string(
-    "vocab", CLASSIFIER_DIR + "/saved_model_label.vocab",
+    "vocab", "saved_model_label.vocab",
     "The label vocab file used to create the classifier.")
-flags.DEFINE_string("seq", "", "The sequence to handle")
+flags.DEFINE_string("seq", "", "The string sequence to process")
 flags.DEFINE_enum("mode", "embed", ["embed", "classify"], "The operation to perform.")
 
 

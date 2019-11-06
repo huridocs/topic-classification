@@ -16,12 +16,16 @@ def index():
 
 @app.route('/classify', methods=['POST'])
 def classify():
-    # request.args: {'classifier': 'bert_for_countries'}
+    # request.args: {
+    #       'bert': 'bert_uncased_L-12_H-768_A-12/1',
+    #       'classifier': 'bert_for_countries',
+    #       'vocab': 'label.vocab'}
     # request.form: {'seq1', 'seq2', 'seq3'}
     error = None
-    c = classifier.Classifier()
-    c.classify()
-    return "Classification goes here"
+    c = classifier.Classifier(
+        request.form['bert'], request.form['classifier'], request.form['vocab'])
+    results = c.classify(request.form['seq'])
+    return str(results)
 
 
 @app.route('/embed', methods=['POST'])

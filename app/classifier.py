@@ -18,7 +18,7 @@ class Classifier:
 
     def __init__(self, bert, classifier, vocab: str):
         self.logger = logging.getLogger('app.logger')
-        self.vocab = fetchVocab(vocab)
+        self.vocab = fetchVocab(classifier + "/" + vocab)
         self.classifier = classifier
         self.embedder = embedder.Embedder(bert)
         self.predictor = tf.contrib.predictor.from_saved_model(self.classifier)
@@ -42,5 +42,5 @@ class Classifier:
         out.sort(key=itemgetter(1), reverse=True)
 
         # TODO: filter results to those above a particular threshold
-
+        out = list(o for o in out if o[1] > 0)
         return out
