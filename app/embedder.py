@@ -6,7 +6,7 @@ from ming import schema
 from ming import Session
 from ming import create_datastore
 from ming.declarative import Document
-import numpy
+import numpy as np
 import tensorflow as tf
 import tensorflow_hub as hub
 
@@ -50,31 +50,29 @@ class Embedder:
                 vocab_file=vocab_file,
                 do_lower_case=do_lower_case)
 
-    def GetEmbedding(self, seq: str):
+    def GetEmbedding(self, seq: str) -> np.array:
         # fetch from cache
         obj = Embedding.m.get(bert=self.bert, seq=seq)
-        if obj and obj.seq_length:
+        if obj:
             self.logger.info("Using embedding matrix fetched from MongoDB...")
-            # convert list back to numpyArray
-            matrix = numpy.array(obj.embedding)
+            # convert list back from list(floats) to np.array
+            matrix = np.array(obj.embedding)
             self.logger.debug(matrix)
-            # return matrix
-            return matrix, obj.seq_length
+            return matrix
 
         self.logger.info("Embedding matrix for bert=%s, seq=%s "
                          "not found in cache. Generating..." %
                          (self.bert, seq))
-        matrix, seq_length = self._buildEmbedding(seq)
+        matrix = self._buildEmbedding(seq)
 
-        # convert numpyArray to list for storage in MongoDB
+        # convert npArray to list for storage in MongoDB
         l_matrix = matrix.tolist()
-        e = Embedding.make(dict(
-            bert=self.bert, seq=seq, embedding=l_matrix, seq_length=seq_length))
+        e = Embedding.make(dict(bert=self.bert, seq=seq, embedding=l_matrix))
         e.m.save()
         self.logger.info("Embedding matrix stored in MongoDB.")
-        return matrix, seq_length
+        return matrix
 
-    def _buildEmbedding(self, seq: str) -> (numpy.array, int):
+    def _buildEmbedding(self, seq: str) -> np.array:
         tokens = self.tokenizer.tokenize(seq)
         if len(tokens) > MAX_SEQ_LENGTH - 2:
             tokens = tokens[:(MAX_SEQ_LENGTH - 2)]
@@ -117,5 +115,6 @@ class Embedder:
             sess.run([
                 tf.compat.v1.global_variables_initializer(),
                 tf.compat.v1.tables_initializer()])
-            out = sess.run(seq_output)[0]
-            return out, len(tokens)
+            out = sess.run(seq_output)[0][:len(tokens), :]
+
+            return out
