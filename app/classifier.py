@@ -3,6 +3,7 @@ import logging
 import string
 import time
 import os
+
 import numpy as np
 import tensorflow as tf
 
@@ -18,7 +19,7 @@ class Classifier:
 
     def __init__(self, bert, classifier, vocab: str):
         self.logger = logging.getLogger('app.logger')
-        self.vocab = fetchVocab(classifier + "/" + vocab)
+        self.vocab = fetchVocab(vocab)
         self.classifier = classifier
         self.embedder = embedder.Embedder(bert)
         self.predictor = tf.contrib.predictor.from_saved_model(self.classifier)
@@ -41,6 +42,9 @@ class Classifier:
         out = list(zip((t.rstrip() for t in self.vocab), results))
         out.sort(key=itemgetter(1), reverse=True)
 
-        # TODO: filter results to those above a particular threshold
+        # TODO: filter results to those above a configurable threshold
         out = list(o for o in out if o[1] > 0)
+        self.logger.info(
+            "Filtered %d results that were at or below the precision "
+            "threshold." % (len(self.vocab) - len(out)))
         return out

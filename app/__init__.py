@@ -32,5 +32,8 @@ app.logger.info(app.config.items())
 if not app.debug:
     app.logger.setLevel(logging.INFO)
 
+os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
+    "/home/samschaevitz/Downloads/BERT Classification-9a8b5ef88627.json")
+
 from app import routes  # nopep8
 from app import task_routes  # nopep8
