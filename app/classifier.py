@@ -8,6 +8,7 @@ import numpy as np
 import tensorflow as tf
 
 from app import embedder
+from app import model_fetcher
 
 
 def fetchVocab(vocab: str):
@@ -17,8 +18,13 @@ def fetchVocab(vocab: str):
 
 class Classifier:
 
-    def __init__(self, bert, classifier, vocab: str):
+    def __init__(self, bert, classifier, vocab: str, prefetch=False):
         self.logger = logging.getLogger('app.logger')
+        if prefetch:
+            f = model_fetcher.Fetcher()
+            filenames = f.fetchAll()
+            for f in filenames:
+                self.logger.info(f)
         self.vocab = fetchVocab(vocab)
         self.classifier = classifier
         self.embedder = embedder.Embedder(bert)

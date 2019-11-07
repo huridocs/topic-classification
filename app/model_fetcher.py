@@ -4,83 +4,70 @@ import os
 
 from google.cloud import storage
 
-
-BUCKET = "bert_classification_models"
-
-MODEL_PREFIX_PATH = "multilabel/{model_name}/saved_model"
-INSTANCE_PREFIX_PATH = MODEL_PREFIX_PATH + "/{training_instance}"
-VARIABLES_PREFIX_PATH = INSTANCE_PREFIX_PATH + "/variables"
-
-LABEL_BLOB_FORMAT = MODEL_PREFIX_PATH + "/label.vocab"
-MODEL_BLOB_FORMAT = INSTANCE_PREFIX_PATH + "/saved_model.pb"
+from app import model_config as mc
 
 
 class Fetcher(object):
-    def __init__(
-            self,
-            bucket=BUCKET,
-            local_dir="./tmp",
-            model_name="UPR_2percent_ps512",
-            training_instance="1572868595"):
-        # Fetch classifier files from Google Cloud Storage
+    """ Fetches classifier model files from Google Cloud Storage """
+
+    def __init__(self, source_config=mc.IN, dest_config=mc.OUT):
         self.logger = logging.getLogger("app.logger")
         self.client = storage.Client()
-        self.bucket = self.client.get_bucket(bucket)
-        self.local_dir = local_dir
-        self.model_name = model_name
-        self.training_instance = training_instance
+        self.src_config = mc.InConfig(source_config)
+        self.dst_config = mc.OutConfig(dest_config)
 
-        os.makedirs(self.local_dir, exist_ok=True)
+        self.bucket = self.client.get_bucket(self.src_config.bucket)
+        os.makedirs(self.dst_config.base_dir, exist_ok=True)
 
-    def fetchLabel(self):
-        source_blob_name = LABEL_BLOB_FORMAT.format(model_name=self.model_name)
-        blob = self.bucket.blob(source_blob_name)
+    def _fetch(self, src_blob, dest_fqfn: str) -> [str]:
+        blob = self.bucket.blob(src_blob)
 
-        destination_file_name = os.path.join(self.local_dir, source_blob_name)
-        local_dest_path = os.path.split(destination_file_name)[0]
-        self.logger.info("local path=%s" % local_dest_path)
-        os.makedirs(local_dest_path, exist_ok=True)
+        dest_file = dest_fqfn
+        os.makedirs(os.path.dirname(dest_file), exist_ok=True)
 
-        blob.download_to_filename(destination_file_name)
-
+        blob.download_to_filename(dest_file)
         self.logger.info('Blob {} downloaded to {}.'.format(
-            source_blob_name, destination_file_name))
+            src_blob, dest_file))
 
-    def fetchModel(self):
-        source_blob_name = MODEL_BLOB_FORMAT.format(
-            model_name=self.model_name, training_instance=self.training_instance)
-        blob = self.bucket.blob(source_blob_name)
+        return [dest_file]
 
-        destination_file_name = os.path.join(self.local_dir, source_blob_name)
-        local_dest_path = os.path.split(destination_file_name)[0]
-        os.makedirs(local_dest_path, exist_ok=True)
+    def fetchVocab(self) -> [str]:
+        return self._fetch(self.src_config.vocab.fqfn,
+                           self.dst_config.vocab.fqfn)
 
-        blob.download_to_filename(destination_file_name)
+    def fetchModel(self) -> [str]:
+        return self._fetch(self.src_config.saved_model.fqfn,
+                           self.dst_config.saved_model.fqfn)
 
-        self.logger.info('Blob {} downloaded to {}.'.format(
-            source_blob_name, destination_file_name))
+    def fetchVariables(self) -> [str]:
+        var_blob_dir = self.src_config.variables.directory + "/"
+        blobs = list(self.bucket.list_blobs(
+            prefix=var_blob_dir, delimiter="/"))
 
-    def fetchVariables(self):
-        prefix = VARIABLES_PREFIX_PATH.format(
-            model_name=self.model_name, training_instance=self.training_instance)
-        local_prefix = os.path.join(self.local_dir, prefix)
-
-        os.makedirs(local_prefix, exist_ok=True)
-        blobs = list(self.bucket.list_blobs(prefix=prefix + "/", delimiter="/"))
+        new_files = []
         for b in blobs:
             blob = self.bucket.blob(b.name)
-            if blob.name == prefix + "/":
+
+            # Note: github.com/googleapis/google-cloud-python/issues/5163
+            if blob.name == var_blob_dir:
                 self.logger.info(
                     "Discarding blob with name equal to "
                     "the directory prefix: %s" % b.name)
                 continue
-            self.logger.info("blob name=%s" % b.name)
 
-            destination_file_name = os.path.join(
-                local_prefix, ntpath.basename(b.name))
-            self.logger.info(
-                "Downloading variables file to " + destination_file_name)
-            blob.download_to_filename(destination_file_name)
-            self.logger.info('Blob {} downloaded to {}.'.format(
-                 blob.name, destination_file_name))
-        return [b.name for b in blobs]
+            dest_var_fqfn = os.path.join(
+                self.dst_config.variables.directory,
+                ntpath.basename(b.name))
+            new_files += self._fetch(b.name, dest_var_fqfn)
+
+        return new_files
+
+    def fetchAll(self) -> [str]:
+        return (
+            ["=====Model====="]
+            + self.fetchModel()
+            + ["=====Label====="]
+            + self.fetchVocab()
+            + ["===Variables==="]
+            + self.fetchVariables()
+        )

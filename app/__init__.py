@@ -3,14 +3,14 @@ import os
 
 from flask import Flask, current_app
 
-from app import config
+from app import flask_config as config
 
 
 CONFIG = {
-    "development": "app.config.DevelopmentConfig",
-    "test": "app.config.TestConfig",
-    "production": "app.config.ProductionConfig",
-    "default": "app.config.DevelopmentConfig",
+    "development": "app.flask_config.DevelopmentConfig",
+    "test": "app.flask_config.TestConfig",
+    "production": "app.flask_config.ProductionConfig",
+    "default": "app.flask_config.DevelopmentConfig",
 }
 
 app = Flask(__name__)
@@ -23,7 +23,7 @@ config_obj = CONFIG[config_name]
 app.logger.debug("config obj: " + config_obj)
 app.config.from_object(config_obj)
 
-if app.config.from_pyfile('config.py'):
+if app.config.from_pyfile('flask_config.py'):
     app.logger.info("Successfully read instance configuration file.")
 app.logger.info("Flask config:")
 app.logger.info(app.config.items())
