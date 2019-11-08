@@ -1,20 +1,30 @@
+import json
 import logging
 import ntpath
 import os
 
+from flask import current_app as app
 from google.cloud import storage
 
 from app import model_config as mc
 
 
 class Fetcher(object):
-    """ Fetches classifier model files from Google Cloud Storage """
+    """ Fetches classifier model files from Google Cloud Storage."""
 
-    def __init__(self, source_config=mc.IN, dest_config=mc.OUT):
+    def __init__(self,
+                 config_path=os.path.join("static", "model_config.json"),
+                 src_config=None, dest_config=None):
         self.logger = logging.getLogger("app.logger")
         self.client = storage.Client()
-        self.src_config = mc.InConfig(source_config)
-        self.dst_config = mc.OutConfig(dest_config)
+        if src_config and dest_config:
+            self.src_config = src_config
+            self.dst_config = dest_config
+        else:
+            with open(config_path) as f:
+                data = json.loads(f.read())
+                self.src_config = mc.InConfig(f["in"])
+                self.dst_config = mc.OutConfig(f["out"])
 
         self.bucket = self.client.get_bucket(self.src_config.bucket)
         os.makedirs(self.dst_config.base_dir, exist_ok=True)

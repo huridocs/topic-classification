@@ -1,6 +1,11 @@
-import logging
-from bert import tokenization as token
 from datetime import datetime
+import logging
+
+from bert import tokenization as token
+from flask import jsonify
+from flask import Blueprint
+from flask import current_app as app
+from flask import request
 from ming import Field
 from ming import schema
 from ming import Session
@@ -17,6 +22,8 @@ MAX_SEQ_LENGTH = 256
 # TODO: Parameterize the MongoDB session for testing.
 bind = create_datastore('classifier_dev')
 session = Session(bind)
+
+embed_bp = Blueprint('embed_bp', __name__)
 
 
 class Embedding(Document):
@@ -116,4 +123,15 @@ class Embedder:
                 tf.compat.v1.tables_initializer()])
             out = sess.run(seq_output)[0][:len(tokens), :]
 
-            return out
+        return out
+
+
+@embed_bp.route('/embed', methods=['POST'])
+def make_embed():
+    error = None
+    data = request.get_json()
+
+    e = Embedder(app.config['BERT'])
+    matrix = e.GetEmbedding(data['seq'])
+
+    return jsonify(str(len(matrix)))

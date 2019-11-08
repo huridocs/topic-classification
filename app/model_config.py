@@ -1,6 +1,6 @@
 import os
 
-# This is directory tree structure for models and their metadata inside of
+# This is the directory tree structure for models and their metadata inside of
 # Google Cloud Storage. The top-level item (e.g. "bert_classification_models")
 # is called the 'bucket'.
 # .
@@ -23,29 +23,32 @@ import os
 #                         ├── variables.data-00000-of-00001
 #                         └── variables.index
 
-
-IN = {
-    "bucket_name": "bert_classification_models",
-    "model_name": "UPR_2percent_ps0",
-    "instance_name": "1573031002",
-    "saved_model": {
-        "name": "saved_model.pb",
-        "path": "multilabel/{model}/saved_model/{instance}",
-    },
-    "variables": {
-        "name": "*",
-        # TODO: come up with a convention on handling recursive copying in the
-        # input configuration.
-        "path": "multilabel/{model}/saved_model/{instance}/variables",
-    },
-    "vocab": {
-        "name": "label.vocab",
-        "path": "multilabel/{model}/saved_model",
-    },
-}
+# TODO: Stop hardcoding this and provide sane default values for the CLI.
+# IN = {
+#     "bucket_name": "bert_classification_models",
+#     "model_name": "UPR_2percent_ps0",
+#     "instance_name": "1573031002",
+#     "saved_model": {
+#         "name": "saved_model.pb",
+#         "path": "multilabel/{model}/saved_model/{instance}",
+#     },
+#     "variables": {
+#         "name": "*",
+#         # TODO: come up with a convention on handling recursive copying in the
+#         # input configuration.
+#         "path": "multilabel/{model}/saved_model/{instance}/variables",
+#     },
+#     "vocab": {
+#         "name": "label.vocab",
+#         "path": "multilabel/{model}/saved_model",
+#     },
+# }
 
 
 class ModelConfig(object):
+    """ A ModelConfig is a configuration object whose attributes """
+    """ correspond to keys in the supplied dictory."""
+
     def __init__(self, conf_dict):
         self._config = conf_dict
 
@@ -114,24 +117,24 @@ class InConfig(ModelConfig):
         return PathConfig(self.get_property("vocab"), self.model_name)
 
 
-OUT = {
-    "base_dir": os.path.join(os.getcwd(), "classifier_models"),
-    "model_name": "UPR_2percent_ps0",
-    "instance_name": "1573031002",
-    "saved_model": {
-        "name": "saved_model.pb",
-        "path": "multilabel/{model}/saved_model/{instance}"
-    },
-    "variables": {
-        "path": "multilabel/{model}/saved_model/{instance}/variables"
-    },
-    "vocab": {
-        "name": "label.vocab",
-        # NOTE: We store the vocab file inside an instance folder
-        # in case it changes between training runs.
-        "path": "multilabel/{model}/saved_model/{instance}"
-    },
-}
+# OUT = {
+#     "base_dir": os.path.join(os.getcwd(), "classifier_models"),
+#     "model_name": "UPR_2percent_ps0",
+#     "instance_name": "1573031002",
+#     "saved_model": {
+#         "name": "saved_model.pb",
+#         "path": "multilabel/{model}/saved_model/{instance}"
+#     },
+#     "variables": {
+#         "path": "multilabel/{model}/saved_model/{instance}/variables"
+#     },
+#     "vocab": {
+#         "name": "label.vocab",
+#         # NOTE: We store the vocab file inside an instance folder
+#         # in case it changes between training runs.
+#         "path": "multilabel/{model}/saved_model/{instance}"
+#     },
+# }
 
 
 class OutConfig(ModelConfig):

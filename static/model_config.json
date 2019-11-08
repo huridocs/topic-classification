@@ -1,0 +1,36 @@
+{
+    "in": {
+        "bucket_name": "bert_classification_models",
+        "model_name": "UPR_2percent_ps0",
+        "instance_name": "1573031002",
+        "saved_model": {
+            "name": "saved_model.pb",
+            "path": "multilabel/{model}/saved_model/{instance}"
+        },
+        "variables": {
+            "name": "*",
+            "path": "multilabel/{model}/saved_model/{instance}/variables"
+        },
+        "vocab": {
+            "name": "label.vocab",
+            "path": "multilabel/{model}/saved_model"
+        }
+    },
+    "out": {
+        "base_dir": "classifier_models",
+        "model_name": "UPR_2percent_ps0",
+        "instance_name": "1573031002",
+        "saved_model": {
+            "name": "saved_model.pb",
+            "path": "multilabel/{model}/saved_model/{instance}"
+        },
+        "variables": {
+            "path": "multilabel/{model}/saved_model/{instance}/variables"
+        },
+        "vocab": {
+            "name": "label.vocab",
+            "path": "multilabel/{model}/saved_model/{instance}"
+        }
+    }
+}
+

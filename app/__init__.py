@@ -3,7 +3,9 @@ import os
 
 from flask import Flask, current_app
 
-from app import flask_config as config
+from app import embedder
+from app import classifier
+from app import flask_config
 
 
 CONFIG = {
@@ -13,27 +15,40 @@ CONFIG = {
     "default": "app.flask_config.DevelopmentConfig",
 }
 
-app = Flask(__name__)
 
-# initialize configuration values
-config_name = os.getenv("FLASK_ENV", 'default')
-app.logger.debug("Reading " + config_name + " configuration...")
+def create_app():
+    app = Flask(__name__)
 
-config_obj = CONFIG[config_name]
-app.logger.debug("config obj: " + config_obj)
-app.config.from_object(config_obj)
+    # initialize configuration values
+    config_name = os.getenv("FLASK_ENV", 'default')
+    app.logger.debug("Reading " + config_name + " configuration...")
 
-if app.config.from_pyfile('flask_config.py'):
-    app.logger.info("Successfully read instance configuration file.")
-app.logger.info("Flask config:")
-app.logger.info(app.config.items())
+    config_obj = CONFIG[config_name]
+    app.logger.debug("config obj: " + config_obj)
+    app.config.from_object(config_obj)
 
-# configure logging
-if not app.debug:
-    app.logger.setLevel(logging.INFO)
+    if app.config.from_pyfile('flask_config.py'):
+        app.logger.info("Successfully read instance configuration file.")
+    app.logger.info("Flask config:")
+    app.logger.info(app.config)
 
-os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
-    "/home/samschaevitz/Downloads/BERT Classification-9a8b5ef88627.json")
+    # configure logging
+    if not app.debug:
+        app.logger.setLevel(logging.INFO)
 
-from app import routes  # nopep8
-from app import task_routes  # nopep8
+    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
+        "/home/samschaevitz/Downloads/BERT Classification-9a8b5ef88627.json")
+
+    with app.app_context():
+        # Include our Routes
+        from . import classifier
+        from . import embedder
+        from . import model_fetcher
+        from . import task_routes
+
+        # Register Blueprints
+        app.register_blueprint(classifier.classify_bp)
+        app.register_blueprint(embedder.embed_bp)
+        app.register_blueprint(task_routes.task_bp)
+
+        return app
