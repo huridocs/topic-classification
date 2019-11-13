@@ -1,15 +1,24 @@
 import json
 import pytest
 
-from app import create_app
 
-
-def test_hello(app):
+def test_classify(app):
     client = app.test_client()
 
     with app.test_request_context():
-        resp = client.get('/')
+        resp = client.post(
+            '/classify',
+            data=json.dumps(dict(seq='hello world!')),
+            content_type='application/json')
     assert resp.status == '200 OK'
 
-    data = resp.data
-    assert data == b"Hello, World!"
+
+def test_embed(app):
+    client = app.test_client()
+
+    with app.test_request_context():
+        resp = client.post(
+            '/embed',
+            data=json.dumps(dict(seq='hello world!')),
+            content_type='application/json')
+    assert resp.status == '200 OK'
