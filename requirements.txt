@@ -10,9 +10,11 @@ bert-tensorflow
 ming
 
 # Dev:
+flask
 pip
 setuptools
 pycodestyle
 autopep8
 nose
 ipython
+pytest
