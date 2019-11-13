@@ -23,6 +23,10 @@ flags.DEFINE_string(
     "classifier", PATH_TO_CLASSIFIER.format(
         model_name=DEFAULT_MODEL, training_instance=DEFAULT_INSTANCE
     ), "The classifier model to use.")
+flags.DEFINE_string(
+    "google_acct_key_path", "./.credz/BERT Classification-9a8b5ef88627.json",
+    "Where is the JSON file containing the Google Cloud Service account key?"
+)
 flags.DEFINE_string("vocab",
                     PATH_TO_VOCAB.format(
                         model_name=DEFAULT_MODEL, training_instance=DEFAULT_INSTANCE),
@@ -41,7 +45,8 @@ def main(argv):
         c = classifier.Classifier(FLAGS.bert, FLAGS.classifier, FLAGS.vocab)
         print(c.classify(FLAGS.seq))
     elif FLAGS.mode == "prefetch":
-        f = model_fetcher.Fetcher()
+        f = model_fetcher.Fetcher(
+            service_acct_key_path=FLAGS.google_acct_key_path)
         dst = f.fetchAll()
         for l in dst:
             print(l)
@@ -49,7 +54,5 @@ def main(argv):
 
 
 if __name__ == '__main__':
-    os.environ['TFHUB_CACHE_DIR'] = os.getcwd() + "/bert_models"
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.join(
-        os.getcwd(), ".credz", "BERT Classification-9a8b5ef88627.json")
+    os.environ["TFHUB_CACHE_DIR"] = os.getcwd() + "/bert_models"
     app.run(main)

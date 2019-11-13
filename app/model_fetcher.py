@@ -14,17 +14,19 @@ class Fetcher(object):
 
     def __init__(self,
                  config_path=os.path.join("static", "model_config.json"),
+                 service_acct_key_path=None,
                  src_config=None, dest_config=None):
         self.logger = logging.getLogger("app.logger")
-        self.client = storage.Client()
+        self.client = storage.Client.from_service_account_json(
+            service_acct_key_path)
         if src_config and dest_config:
             self.src_config = src_config
             self.dst_config = dest_config
         else:
             with open(config_path) as f:
                 data = json.loads(f.read())
-                self.src_config = mc.InConfig(f["in"])
-                self.dst_config = mc.OutConfig(f["out"])
+                self.src_config = mc.InConfig(data["in"])
+                self.dst_config = mc.OutConfig(data["out"])
 
         self.bucket = self.client.get_bucket(self.src_config.bucket)
         os.makedirs(self.dst_config.base_dir, exist_ok=True)

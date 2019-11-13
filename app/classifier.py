@@ -21,11 +21,6 @@ RETAIN_THRESHOLD = 0.4
 classify_bp = Blueprint('classify_bp', __name__)
 
 
-def loadVocab(vocab: str):
-    with open(vocab, 'r') as f:
-        return f.readlines()
-
-
 class Classifier:
     """ Classifier may classify a string sequence's topic probability vector.
 
@@ -41,10 +36,38 @@ class Classifier:
 
     def __init__(self, path_to_bert, path_to_classifier, path_to_vocab: str):
         self.logger = logging.getLogger('app.logger')
-        self.vocab = loadVocab(path_to_vocab)
-        self.classifier = path_to_classifier
-        self.embedder = embedder.Embedder(path_to_bert)
-        self.predictor = tf.contrib.predictor.from_saved_model(self.classifier)
+        self._init_vocab(path_to_vocab)
+        self._init_embedding(path_to_bert)
+        self._init_predictor(path_to_classifier)
+
+    def _init_vocab(self, path_to_vocab: str):
+        try:
+            with open(path_to_vocab, 'r') as f:
+                self.vocab = f.readlines()
+        except Exception as e:
+            self.logger.error(
+                "Failure to load vocab file from %s:" % path_to_vocab)
+            raise
+
+    def _init_embedding(self, path_to_bert: str):
+        try:
+            self.embedder = embedder.Embedder(path_to_bert)
+        except Exception as e:
+            self.logger.error(
+                "Failure to load embedding created using BERT model %s:" % path_to_bert
+            )
+            raise
+
+    def _init_predictor(self, path_to_classifier: str):
+        try:
+            self.predictor = tf.contrib.predictor.from_saved_model(
+                path_to_classifier)
+        except Exception as e:
+            self.logger.error(
+                "Failure to create predictor based on classifer at path %s" %
+                path_to_classifier
+            )
+            raise
 
     def classify(self, seq: str) -> [(str, float)]:
         """ classify calculates and returns a particular sequence's topic probability vector.
@@ -98,6 +121,7 @@ def classify():
         dest_config = mc.OutConfig(d["out"])
 
     fetched = model_fetcher.Fetcher(
+        service_acct_key_path=app.config["GOOGLE_ACCT_KEY_PATH"],
         src_config=src_config, dest_config=dest_config).fetchAll()
     print(fetched)
 

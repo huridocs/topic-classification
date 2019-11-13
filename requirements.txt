@@ -17,4 +17,5 @@ pycodestyle
 autopep8
 nose
 ipython
+pyfakefs
 pytest
