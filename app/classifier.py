@@ -31,13 +31,10 @@ class Classifier:
     """ Classifier may classify a string sequence's topic probability vector.
 
         Parameters:
-            path_to_bert (str): the URL path to a BERT model e.g.
-                    http://tf.google.com/bert_uncased.
-            path_to_classifier (str): the local path to the dir
-                    containing a saved classifier model and its variables.
-            path_to_vocab (str): the local path to a vocab label file to
-                    be used in constructing human-readable topic classification
-                    output.
+            classifier_model_base_path (str): the local path to the dir
+                    containing all saved classifier models and their instances.
+            model_name (str): the name of the training model (e.g.
+                    UPR_2percent_ps0)
     """
 
     # TODO: The config should be per model, and should contain the bert and
@@ -45,10 +42,11 @@ class Classifier:
     def __init__(self,
                  classifier_model_base_path: str,
                  model_name: str,):
-        self.logger = logging.getLogger('app.logger')
+
+        self.logger = logging.getLogger()
 
         model_config_path = os.path.join(classifier_model_base_path, model_name)
-        self.instance, self.instance_config = self.get_instance(model_config_path)
+        self._load_instance(model_config_path)
 
         fq_instance_dir = os.path.join(model_config_path, self.instance)
         self.embedder = embedder.Embedder(self.instance_config.bert)
@@ -57,21 +55,21 @@ class Classifier:
 
         self.predictor = tf.contrib.predictor.from_saved_model(fq_instance_dir)
 
-    def get_instance(
+    def _load_instance(
             self, relative_path_to_model: str) -> (str, mc.InstanceConfig):
-        app.logger.info(
-            "looking for model instance for %s" % relative_path_to_model)
         instances = os.listdir(relative_path_to_model)
-        for i in instances:
-            app.logger.info("dir found: %s" % i)
+        # pick the latest released instance
+        for i in sorted(instances, reverse=True):
             with open(os.path.join(
                     relative_path_to_model, i, "config.json")) as f:
                 d = json.loads(f.read())
                 if d["is_released"]:
-                    app.logger.info("using instance config for %s" % i)
-                    return i, mc.InstanceConfig(d)
+                    self.instance = i
+                    self.instance_config = mc.InstanceConfig(d)
+                    return
         raise Exception(
-            "No valid instance of model found in %s" % relative_path_to_model)
+            "No valid instance of model found in %s, instances were %s" % (
+                relative_path_to_model, instances))
 
     def classify(self, seq: str) -> [(str, float)]:
         """ classify calculates and returns a particular sequence's topic probability vector.
@@ -95,7 +93,7 @@ class Classifier:
 
         predictions = self.predictor(features)
         probabilities = predictions["probabilities"][0]
-        self.logger.debug(probabilities)
+        logging.getLogger().debug(probabilities)
 
         # map results back to topic strings, according to classifier metadata
         # e.g. [('education', 0.8), ('rights of the child', 0.9)]
