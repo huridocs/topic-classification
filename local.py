@@ -8,16 +8,19 @@ from app import model_fetcher
 from absl import app
 from absl import flags
 
-# TODO: Label models as "released" and remove hard-coded IDs here.
-DEFAULT_MODEL = "UPR_2percent_ps0"
-
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string(
     "bert", "https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1", "The bert model to use")
 flags.DEFINE_string(
     "classifier_dir", "./classifier_models", "The dir containing classifier models.")
+flags.DEFINE_string("model", "UPR_2percent_ps0",
+                    "The model trained for a particular label set.")
 flags.DEFINE_string("seq", "", "The string sequence to process")
+flags.DEFINE_string("fetch_config_path", "./static/model_fetching_config.json",
+                    "Path to the JSON config file describe where to fetch "
+                    "saved models from and where to copy them to.")
+
 flags.DEFINE_enum("mode", "embed", ["embed", "classify", "prefetch"], "The operation to perform.")
 
 
@@ -29,9 +32,9 @@ def main(argv):
         print(len(m.tostring()))
     elif FLAGS.mode == "classify":
         c = classifier.Classifier(FLAGS.classifier_dir)
-        print(c.classify(FLAGS.seq, DEFAULT_MODEL))
+        print(c.classify(FLAGS.seq, FLAGS.model))
     elif FLAGS.mode == "prefetch":
-        f = model_fetcher.Fetcher()
+        f = model_fetcher.Fetcher(FLAGS.fetch_config_path)
         dst = f.fetchAll()
         for l in dst:
             print(l)
