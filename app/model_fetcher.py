@@ -22,8 +22,8 @@ class Fetcher(object):
         else:
             with open(config_path) as f:
                 data = json.loads(f.read())
-                self.src_config = mc.InConfig(data["in"])
-                self.dst_config = mc.OutConfig(data["out"])
+                self.src_config = mc.InConfig(data["source"])
+                self.dst_config = mc.OutConfig(data["destination"])
 
         self.client = storage.Client.from_service_account_json(
             self.src_config.google_acct_key_path)

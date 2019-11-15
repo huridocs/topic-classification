@@ -13,6 +13,9 @@ def create_app():
     # initialize configuration values
     config_name = os.getenv("FLASK_ENV", 'default')
     app.logger.debug("Reading " + config_name + " configuration...")
+    app.logger.debug("App config:")
+    for k, v in app.config.items():
+        app.logger.debug("%s: %s" % (k, v))
 
     # configure logging
     if not app.debug:

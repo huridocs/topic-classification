@@ -105,8 +105,8 @@ def classify():
 
     with open(model_config_path) as f:
         d = json.loads(f.read())
-        src_config = mc.InConfig(d["in"])
-        dest_config = mc.OutConfig(d["out"])
+        src_config = mc.InConfig(d["source"])
+        dest_config = mc.OutConfig(d["destination"])
 
     c = Classifier(
         src_config.bert,
