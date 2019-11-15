@@ -23,8 +23,8 @@ class Fetcher(object):
         else:
             with open(config_path) as f:
                 data = json.loads(f.read())
-                self.src_config = mc.InConfig(f["in"])
-                self.dst_config = mc.OutConfig(f["out"])
+                self.src_config = mc.InConfig(data["in"])
+                self.dst_config = mc.OutConfig(data["out"])
 
         self.bucket = self.client.get_bucket(self.src_config.bucket)
         os.makedirs(self.dst_config.base_dir, exist_ok=True)

@@ -52,5 +52,5 @@ def main(argv):
 if __name__ == '__main__':
     os.environ['TFHUB_CACHE_DIR'] = os.getcwd() + "/bert_models"
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = os.path.join(
-        os.getcwd(), ".credz", "BERT Classification-9a8b5ef88627.json")
+        os.getcwd(), ".credz", "bert-classification-key.json")
     app.run(main)
