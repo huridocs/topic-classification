@@ -69,6 +69,10 @@ class PathConfig(ModelConfig):
 class InConfig(ModelConfig):
 
     @property
+    def google_acct_key_path(self):
+        return self.get_property("google_acct_key_path")
+
+    @property
     def bucket(self):
         return self.get_property("bucket_name")
 

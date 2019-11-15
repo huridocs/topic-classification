@@ -16,7 +16,6 @@ class Fetcher(object):
                  config_path="./static/model_config.json",
                  src_config=None, dest_config=None):
         self.logger = logging.getLogger("app.logger")
-        self.client = storage.Client()
         if src_config and dest_config:
             self.src_config = src_config
             self.dst_config = dest_config
@@ -26,6 +25,8 @@ class Fetcher(object):
                 self.src_config = mc.InConfig(data["in"])
                 self.dst_config = mc.OutConfig(data["out"])
 
+        self.client = storage.Client.from_service_account_json(
+            self.src_config.google_acct_key_path)
         self.bucket = self.client.get_bucket(self.src_config.bucket)
         os.makedirs(self.dst_config.base_dir, exist_ok=True)
 

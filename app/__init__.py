@@ -36,9 +36,6 @@ def create_app():
     if not app.debug:
         app.logger.setLevel(logging.INFO)
 
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
-        app.config["GOOGLE_ACCT_KEY_PATH"])
-
     with app.app_context():
         # Include our Routes
         from . import classifier

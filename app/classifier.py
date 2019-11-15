@@ -107,10 +107,6 @@ def classify():
         src_config = mc.InConfig(d["in"])
         dest_config = mc.OutConfig(d["out"])
 
-    fetched = model_fetcher.Fetcher(
-        src_config=src_config, dest_config=dest_config).fetchAll()
-    print(fetched)
-
     c = Classifier(
         src_config.bert,
         dest_config.saved_model.directory,
