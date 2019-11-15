@@ -34,7 +34,12 @@ class Classifier:
                     output.
     """
 
-    def __init__(self, path_to_bert, path_to_classifier, path_to_vocab: str):
+    # TODO: The config should be per model, and should contain the bert and
+    # vocab paths, alleviating the need to respecify them here in init.
+    def __init__(self,
+                 path_to_bert: str,
+                 path_to_classifier: str,
+                 path_to_vocab: str):
         self.logger = logging.getLogger('app.logger')
         self._init_vocab(path_to_vocab)
         self._init_embedding(path_to_bert)
@@ -114,8 +119,13 @@ def classify():
     # request.get_json: {"seq"="hello world"}
     error = None
     data = request.get_json()
+    args = request.args
 
-    with open(app.config["MODEL_CONFIG_PATH"]) as f:
+    model_config_path = app.config["MODEL_CONFIG_PATH"]
+    if args.get("model_config_path"):
+        model_config_path = args.get("model_config_path")
+
+    with open(model_config_path) as f:
         d = json.loads(f.read())
         src_config = mc.InConfig(d["in"])
         dest_config = mc.OutConfig(d["out"])
@@ -126,7 +136,7 @@ def classify():
     print(fetched)
 
     c = Classifier(
-        app.config['BERT'],
+        src_config.bert,
         dest_config.saved_model.directory,
         dest_config.vocab.fqfn)
     results = c.classify(data['seq'])

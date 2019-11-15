@@ -13,7 +13,7 @@ class Fetcher(object):
     """ Fetches classifier model files from Google Cloud Storage."""
 
     def __init__(self,
-                 config_path=os.path.join("static", "model_config.json"),
+                 config_path="./static/model_config.json",
                  service_acct_key_path=None,
                  src_config=None, dest_config=None):
         self.logger = logging.getLogger("app.logger")

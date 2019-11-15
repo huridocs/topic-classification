@@ -8,6 +8,7 @@ from app import model_fetcher
 from absl import app
 from absl import flags
 
+# TODO: Label models as "released" and remove hard-coded IDs here.
 DEFAULT_MODEL = "UPR_2percent_ps0"
 DEFAULT_INSTANCE = "1573031002"
 PATH_TO_CLASSIFIER = os.path.join(

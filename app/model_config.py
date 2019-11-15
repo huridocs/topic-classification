@@ -23,27 +23,6 @@ import os
 #                         ├── variables.data-00000-of-00001
 #                         └── variables.index
 
-# TODO: Stop hardcoding this and provide sane default values for the CLI.
-# IN = {
-#     "bucket_name": "bert_classification_models",
-#     "model_name": "UPR_2percent_ps0",
-#     "instance_name": "1573031002",
-#     "saved_model": {
-#         "name": "saved_model.pb",
-#         "path": "multilabel/{model}/saved_model/{instance}",
-#     },
-#     "variables": {
-#         "name": "*",
-#         # TODO: come up with a convention on handling recursive copying in the
-#         # input configuration.
-#         "path": "multilabel/{model}/saved_model/{instance}/variables",
-#     },
-#     "vocab": {
-#         "name": "label.vocab",
-#         "path": "multilabel/{model}/saved_model",
-#     },
-# }
-
 
 class ModelConfig(object):
     """ A ModelConfig is a configuration object whose attributes """
@@ -86,6 +65,7 @@ class PathConfig(ModelConfig):
                 model=self.model, instance=self.instance)
 
 
+# TODO: Deduplicate In and Out config classes.
 class InConfig(ModelConfig):
 
     @property
@@ -95,6 +75,10 @@ class InConfig(ModelConfig):
     @property
     def model_name(self):
         return self.get_property("model_name")
+
+    @property
+    def bert(self):
+        return self.get_property("bert")
 
     @property
     def instance_name(self):
@@ -117,26 +101,7 @@ class InConfig(ModelConfig):
         return PathConfig(self.get_property("vocab"), self.model_name)
 
 
-# OUT = {
-#     "base_dir": os.path.join(os.getcwd(), "classifier_models"),
-#     "model_name": "UPR_2percent_ps0",
-#     "instance_name": "1573031002",
-#     "saved_model": {
-#         "name": "saved_model.pb",
-#         "path": "multilabel/{model}/saved_model/{instance}"
-#     },
-#     "variables": {
-#         "path": "multilabel/{model}/saved_model/{instance}/variables"
-#     },
-#     "vocab": {
-#         "name": "label.vocab",
-#         # NOTE: We store the vocab file inside an instance folder
-#         # in case it changes between training runs.
-#         "path": "multilabel/{model}/saved_model/{instance}"
-#     },
-# }
-
-
+# TODO: Deduplicate In and Out config classes.
 class OutConfig(ModelConfig):
 
     @property

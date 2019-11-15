@@ -5,7 +5,7 @@ import pytest
 import time
 
 
-@pytest.mark.incremental
+@pytest.mark.incremental  # Make it obvious which request is problematic if fail
 class TestWait1:
     def test_task_not_found(self, app):
         client = app.test_client()
