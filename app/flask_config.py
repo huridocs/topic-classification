@@ -5,8 +5,7 @@ FLASK_ENV environment variable (usually configured in ../.flaskenv)."""
 class Config(object):
     DEBUG = False
     TESTING = False
-    GOOGLE_ACCT_KEY_PATH = "./.credz/bert-classification-key.json"
-    MODEL_CONFIG_PATH = "./static/model_config.json"
+    #MODEL_CONFIG_PATH = "./static/model_config.json"
 
 
 class ProductionConfig(Config):

@@ -17,6 +17,7 @@ from app import model_fetcher
 
 # The magic ML threshold of values we're confident are relevant enough
 RETAIN_THRESHOLD = 0.4
+MODEL_CONFIG_PATH = "./static/model_config.json"
 
 classify_bp = Blueprint('classify_bp', __name__)
 
@@ -98,7 +99,7 @@ def classify():
     data = request.get_json()
     args = request.args
 
-    model_config_path = app.config["MODEL_CONFIG_PATH"]
+    model_config_path = MODEL_CONFIG_PATH
     if args.get("model_config_path"):
         model_config_path = args.get("model_config_path")
 

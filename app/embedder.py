@@ -131,7 +131,7 @@ def embed():
     error = None
     data = request.get_json()
 
-    e = Embedder(app.config['BERT'])
+    e = Embedder(data['bert'])
     matrix = e.GetEmbedding(data['seq'])
 
     return jsonify(str(len(matrix)))
