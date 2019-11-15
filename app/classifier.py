@@ -11,7 +11,7 @@ from flask import request
 import numpy as np
 import tensorflow as tf
 
-from app import embedder
+from app import embedder as e
 from app import model_config as mc
 from app import model_fetcher
 
@@ -25,27 +25,14 @@ class Classifier:
     """ Classifier may classify a string sequence's topic probability vector.
 
         Parameters:
-            classifier_model_base_path (str): the local path to the dir
+            base_classifier_dir (str): the local path to the dir
                     containing all saved classifier models and their instances.
-            model_name (str): the name of the training model (e.g.
-                    UPR_2percent_ps0)
     """
     def __init__(self,
-                 classifier_model_base_path: str,
-                 model_name: str,):
+                 base_classifier_dir: str):
 
         self.logger = logging.getLogger()
-
-        model_config_path = os.path.join(classifier_model_base_path, model_name)
-        self._load_instance(model_config_path)
-
-        fq_instance_dir = os.path.join(model_config_path, self.instance)
-        self.embedder = embedder.Embedder(self.instance_config.bert)
-        self._load_vocab(os.path.join(
-                fq_instance_dir,
-                self.instance_config.vocab))
-
-        self.predictor = tf.contrib.predictor.from_saved_model(fq_instance_dir)
+        self.base_classifier_dir = base_classifier_dir
 
     def _load_instance(
             self, relative_path_to_model: str):
@@ -67,18 +54,31 @@ class Classifier:
         with open(relative_path_to_vocab, 'r') as f:
             self.vocab = f.readlines()
 
-    def classify(self, seq: str) -> [(str, float)]:
+    def classify(self, seq: str, model_name: str) -> [(str, float)]:
         """ classify calculates and returns a particular sequence's topic probability vector.
 
         Parameters:
             seq (str): The text sequence to be classified with this model.
+            model_name (str): the name of the training model (e.g.
+                    UPR_2percent_ps0)
 
         Returns:
             [(str, float)]: The topic probabilty vector in descending order,
                     with topics below the minimum threshold (default=0.4)
                     discarded.
         """
-        embedding = self.embedder.GetEmbedding(seq)
+
+        model_config_path = os.path.join(self.base_classifier_dir, model_name)
+        self._load_instance(model_config_path)
+
+        fq_instance_dir = os.path.join(model_config_path, self.instance)
+        embedder = e.Embedder(self.instance_config.bert)
+        self._load_vocab(os.path.join(
+                fq_instance_dir,
+                self.instance_config.vocab))
+
+        predictor = tf.contrib.predictor.from_saved_model(fq_instance_dir)
+        embedding = embedder.GetEmbedding(seq)
         input_mask = [1] * embedding.shape[0]
 
         # classify seq, with its embedding matrix, using a specific model
@@ -87,7 +87,7 @@ class Classifier:
             "input_mask": np.expand_dims(input_mask, axis=0),
         }
 
-        predictions = self.predictor(features)
+        predictions = predictor(features)
         probabilities = predictions["probabilities"][0]
         logging.getLogger().debug(probabilities)
 
@@ -114,9 +114,7 @@ def classify():
     data = request.get_json()
     args = request.args
 
-    c = Classifier(
-        app.config["BASE_CLASSIFIER_DIR"],
-        args["model"])
+    c = Classifier(app.config["BASE_CLASSIFIER_DIR"])
 
-    results = c.classify(data['seq'])
+    results = c.classify(data['seq'], args["model"])
     return jsonify(str(results))
