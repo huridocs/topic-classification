@@ -13,9 +13,9 @@ class Fetcher(object):
     """ Fetches classifier model files from Google Cloud Storage."""
 
     def __init__(self,
-                 config_path="./static/model_config.json",
+                 config_path="./static/model_fetching_config.json",
                  src_config=None, dest_config=None):
-        self.logger = logging.getLogger("app.logger")
+        self.logger = logging.getLogger()
         if src_config and dest_config:
             self.src_config = src_config
             self.dst_config = dest_config

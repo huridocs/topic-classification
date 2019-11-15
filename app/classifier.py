@@ -17,14 +17,8 @@ from app import model_fetcher
 
 # The magic ML threshold of values we're confident are relevant enough
 RETAIN_THRESHOLD = 0.4
-MODEL_CONFIG_PATH = "./static/model_config.json"
 
 classify_bp = Blueprint('classify_bp', __name__)
-
-
-def loadVocab(vocab: str):
-    with open(vocab, 'r') as f:
-        return f.readlines()
 
 
 class Classifier:
@@ -36,9 +30,6 @@ class Classifier:
             model_name (str): the name of the training model (e.g.
                     UPR_2percent_ps0)
     """
-
-    # TODO: The config should be per model, and should contain the bert and
-    # vocab paths, alleviating the need to respecify them here in init.
     def __init__(self,
                  classifier_model_base_path: str,
                  model_name: str,):
@@ -50,13 +41,14 @@ class Classifier:
 
         fq_instance_dir = os.path.join(model_config_path, self.instance)
         self.embedder = embedder.Embedder(self.instance_config.bert)
-        self.vocab = loadVocab(
-            os.path.join(fq_instance_dir, self.instance_config.vocab))
+        self._load_vocab(os.path.join(
+                fq_instance_dir,
+                self.instance_config.vocab))
 
         self.predictor = tf.contrib.predictor.from_saved_model(fq_instance_dir)
 
     def _load_instance(
-            self, relative_path_to_model: str) -> (str, mc.InstanceConfig):
+            self, relative_path_to_model: str):
         instances = os.listdir(relative_path_to_model)
         # pick the latest released instance
         for i in sorted(instances, reverse=True):
@@ -70,6 +62,10 @@ class Classifier:
         raise Exception(
             "No valid instance of model found in %s, instances were %s" % (
                 relative_path_to_model, instances))
+
+    def _load_vocab(self, relative_path_to_vocab: str):
+        with open(relative_path_to_vocab, 'r') as f:
+            self.vocab = f.readlines()
 
     def classify(self, seq: str) -> [(str, float)]:
         """ classify calculates and returns a particular sequence's topic probability vector.
