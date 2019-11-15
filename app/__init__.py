@@ -14,6 +14,9 @@ def create_app():
     config_name = os.getenv("FLASK_ENV", 'default')
     app.logger.debug("Reading " + config_name + " configuration...")
     app.logger.debug("App config:")
+
+    # hard-code some configuration
+    app.config["BASE_CLASSIFIER_DIR"] = "./classifier_models"
     for k, v in app.config.items():
         app.logger.debug("%s: %s" % (k, v))
 

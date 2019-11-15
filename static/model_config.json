@@ -24,14 +24,14 @@
         "instance_name": "1573031002",
         "saved_model": {
             "name": "saved_model.pb",
-            "path": "multilabel/{model}/saved_model/{instance}"
+            "path": "{model}/{instance}"
         },
         "variables": {
-            "path": "multilabel/{model}/saved_model/{instance}/variables"
+            "path": "{model}/{instance}/variables"
         },
         "vocab": {
             "name": "label.vocab",
-            "path": "multilabel/{model}/saved_model/{instance}"
+            "path": "{model}/{instance}"
         }
     }
 }

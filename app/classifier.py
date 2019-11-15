@@ -94,23 +94,25 @@ class Classifier:
 
 @classify_bp.route('/classify', methods=['POST'])
 def classify():
-    # request.get_json: {"seq"="hello world"}
+    # request.get_json: {"seq"="hello world", "model"="upr_info_issues"}
     error = None
     data = request.get_json()
     args = request.args
 
     model_config_path = MODEL_CONFIG_PATH
-    if args.get("model_config_path"):
-        model_config_path = args.get("model_config_path")
+    if args.get("model"):
+        model = args.get("model")
+        app.logger.info("Overwriting model path: %s" % model)
+        model_config_path = os.path.join(
+            app.config["BASE_CLASSIFIER_DIR"], model)
 
-    with open(model_config_path) as f:
+    with open(os.path.join(model_config_path, "config.json")) as f:
         d = json.loads(f.read())
-        src_config = mc.InConfig(d["source"])
-        dest_config = mc.OutConfig(d["destination"])
+        instance_config = mc.InstanceConfig(d)
 
     c = Classifier(
-        src_config.bert,
-        dest_config.saved_model.directory,
-        dest_config.vocab.fqfn)
+        instance_config.bert,
+        model_config_path,
+        os.path.join(model_config_path, instance_config.vocab))
     results = c.classify(data['seq'])
     return jsonify(str(results))

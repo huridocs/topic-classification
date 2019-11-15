@@ -37,6 +37,24 @@ class ModelConfig(object):
         return self._config[property_name]
 
 
+class InstanceConfig(ModelConfig):
+    @property
+    def bert(self):
+        return self.get_property("bert")
+
+    @property
+    def vocab(self):
+        return self.get_property("vocab")
+
+    @property
+    def is_released(self):
+        return self.get_property("is_released")
+
+    @property
+    def description(self):
+        return self.get_property("description")
+
+
 class PathConfig(ModelConfig):
 
     def __init__(self, conf_dict, model, instance=None, prefix=""):
