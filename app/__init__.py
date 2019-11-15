@@ -5,7 +5,6 @@ from flask import Flask, current_app
 
 from app import embedder
 from app import classifier
-from app import flask_config
 
 
 def create_app():
