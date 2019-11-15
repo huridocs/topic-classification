@@ -43,14 +43,35 @@ class Classifier:
     # TODO: The config should be per model, and should contain the bert and
     # vocab paths, alleviating the need to respecify them here in init.
     def __init__(self,
-                 path_to_bert: str,
-                 path_to_classifier: str,
-                 path_to_vocab: str):
+                 classifier_model_base_path: str,
+                 model_name: str,):
         self.logger = logging.getLogger('app.logger')
-        self.vocab = loadVocab(path_to_vocab)
-        self.classifier = path_to_classifier
-        self.embedder = embedder.Embedder(path_to_bert)
-        self.predictor = tf.contrib.predictor.from_saved_model(self.classifier)
+
+        model_config_path = os.path.join(classifier_model_base_path, model_name)
+        self.instance, self.instance_config = self.get_instance(model_config_path)
+
+        fq_instance_dir = os.path.join(model_config_path, self.instance)
+        self.embedder = embedder.Embedder(self.instance_config.bert)
+        self.vocab = loadVocab(
+            os.path.join(fq_instance_dir, self.instance_config.vocab))
+
+        self.predictor = tf.contrib.predictor.from_saved_model(fq_instance_dir)
+
+    def get_instance(
+            self, relative_path_to_model: str) -> (str, mc.InstanceConfig):
+        app.logger.info(
+            "looking for model instance for %s" % relative_path_to_model)
+        instances = os.listdir(relative_path_to_model)
+        for i in instances:
+            app.logger.info("dir found: %s" % i)
+            with open(os.path.join(
+                    relative_path_to_model, i, "config.json")) as f:
+                d = json.loads(f.read())
+                if d["is_released"]:
+                    app.logger.info("using instance config for %s" % i)
+                    return i, mc.InstanceConfig(d)
+        raise Exception(
+            "No valid instance of model found in %s" % relative_path_to_model)
 
     def classify(self, seq: str) -> [(str, float)]:
         """ classify calculates and returns a particular sequence's topic probability vector.
@@ -99,20 +120,9 @@ def classify():
     data = request.get_json()
     args = request.args
 
-    model_config_path = MODEL_CONFIG_PATH
-    if args.get("model"):
-        model = args.get("model")
-        app.logger.info("Overwriting model path: %s" % model)
-        model_config_path = os.path.join(
-            app.config["BASE_CLASSIFIER_DIR"], model)
-
-    with open(os.path.join(model_config_path, "config.json")) as f:
-        d = json.loads(f.read())
-        instance_config = mc.InstanceConfig(d)
-
     c = Classifier(
-        instance_config.bert,
-        model_config_path,
-        os.path.join(model_config_path, instance_config.vocab))
+        app.config["BASE_CLASSIFIER_DIR"],
+        args["model"])
+
     results = c.classify(data['seq'])
     return jsonify(str(results))
