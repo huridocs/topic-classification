@@ -2,6 +2,7 @@
     "in": {
         "bucket_name": "bert_classification_models",
         "model_name": "UPR_2percent_ps0",
+        "bert": "https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1",
         "instance_name": "1573031002",
         "saved_model": {
             "name": "saved_model.pb",

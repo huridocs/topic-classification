@@ -127,7 +127,7 @@ class Embedder:
 
 
 @embed_bp.route('/embed', methods=['POST'])
-def make_embed():
+def embed():
     error = None
     data = request.get_json()
 

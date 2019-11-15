@@ -37,7 +37,7 @@ def create_app():
         app.logger.setLevel(logging.INFO)
 
     os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
-        "/home/samschaevitz/Downloads/BERT Classification-9a8b5ef88627.json")
+        app.config["GOOGLE_ACCT_KEY_PATH"])
 
     with app.app_context():
         # Include our Routes

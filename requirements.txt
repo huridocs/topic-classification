@@ -15,6 +15,5 @@ pip
 setuptools
 pycodestyle
 autopep8
-nose
 ipython
 pytest
