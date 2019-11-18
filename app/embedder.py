@@ -27,15 +27,17 @@ class Embedding(MappedClass):
     class __mongometa__:
         session = session
         name = 'embedding_cache'
+        unique_indexes = [('bert', 'seq')]
 
     _id = FieldProperty(schema.ObjectId)
-    bert = FieldProperty(schema.String)
-    seq = FieldProperty(schema.String)
-    embedding = FieldProperty(schema.Array(schema.Array(schema.Float)))
+    bert = FieldProperty(schema.String, required=True)
+    seq = FieldProperty(schema.String, required=True)
+    embedding = FieldProperty(schema.Array(schema.Array(schema.Float)), required=True)
     update_timestamp = FieldProperty(datetime, if_missing=datetime.utcnow)
 
 
 Mapper.compile_all()
+Mapper.ensure_all_indexes()
 
 
 class Embedder:
@@ -69,9 +71,8 @@ class Embedder:
             else:
                 undone_seqs.add(seq)
 
-        num_done = sum(0 if r is None else 1 for r in result)
         self.logger.info("Using %d of %d embedding matrices fetched from MongoDB." %
-                         (num_done, len(seqs)))
+                         (len(result), len(seqs)))
         if len(undone_seqs) == 0:
             return result
 

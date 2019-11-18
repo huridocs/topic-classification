@@ -31,8 +31,8 @@ def main(argv):
         m = e.GetEmbedding([FLAGS.seq, FLAGS.seq + ' 2'])
         print([(seq, len(m.tostring())) for seq, m in m.items()])
     elif FLAGS.mode == "classify":
-        c = classifier.Classifier(FLAGS.classifier_dir)
-        print(c.classify([FLAGS.seq, FLAGS.seq + ' 2'], FLAGS.model))
+        c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
+        print(c.classify([FLAGS.seq, FLAGS.seq + ' 2']))
     elif FLAGS.mode == "prefetch":
         f = model_fetcher.Fetcher(FLAGS.fetch_config_path)
         dst = f.fetchAll()

@@ -1,3 +1,31 @@
+### Add seqs
+POST http://localhost:5000/classification_sample?model=upr-info_issues HTTP/1.1
+content-type: application/json
+
+{
+    "entries": [
+        {
+            "seq": "hello world",
+            "training_labels" : [{
+                "topic": "abc"
+            }]
+        },
+        {
+            "seq": "hello world 2",
+            "training_labels" : [{
+                "topic": "abc2"
+            }]
+        }
+    ]
+}
+
+### Del seqs
+DELETE http://localhost:5000/classification_sample?model=upr-info_issues&seq=hello%20world HTTP/1.1
+
+### Del all
+DELETE http://localhost:5000/classification_sample?model=upr-info_issues&seq=* HTTP/1.1
+
+
 
 ### POST
 POST http://localhost:5000/task HTTP/1.1

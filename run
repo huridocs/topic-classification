@@ -27,7 +27,7 @@ elif [ $1 = "local" ]; then
 elif [ $1 = "test" ]; then
   python -m pytest -v -q
 elif [ $1 = "lint" ]; then
-  pycodestyle && python -m mypy app/*.py tests/*.py
+  pycodestyle && python -m mypy *.py app/*.py tests/*.py
 else
   "$@"
 fi
