@@ -1,5 +1,6 @@
 # Prod:
 flask
+google-cloud-storage
 python-dotenv
 tensorflow==1.15.0
 tensorflow-gpu==1.15.0
@@ -9,9 +10,10 @@ bert-tensorflow
 ming
 
 # Dev:
+flask
 pip
 setuptools
 pycodestyle
 autopep8
-nose
 ipython
+pytest

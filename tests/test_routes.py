@@ -1,21 +1,28 @@
-from app import app
-import unittest
 import json
+import pytest
 
 
-class TestRoutes(unittest.TestCase):
+def test_classify(app):
+    client = app.test_client()
 
-    def setUp(self):
-        self.client = app.test_client()
-        self.client.testing = True
-
-    def test_hello(self):
-        resp = self.client.get('/')
-        self.assertEqual(resp.status, '200 OK')
-
-        data = resp.data
-        self.assertEqual(data, b"Hello, World!")
+    with app.test_request_context():
+        data = {'model': 'test_model'}
+        resp = client.post(
+            '/classify?model=test_model',
+            data=json.dumps({'seq': 'hello world!'}),
+            content_type='application/json')
+    assert resp.status == '200 OK'
 
 
-if __name__ == '__main__':
-    unittest.main()
+def test_embed(app):
+    client = app.test_client()
+
+    with app.test_request_context():
+        resp = client.post(
+            '/embed',
+            data=json.dumps(
+                    {'seq': 'hello world!',
+                     'bert': ('https://tfhub.dev/google/'
+                              'bert_uncased_L-12_H-768_A-12/1')}),
+            content_type='application/json')
+    assert resp.status == '200 OK'

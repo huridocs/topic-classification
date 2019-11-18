@@ -1,12 +1,17 @@
-import logging
-from bert import tokenization as token
 from datetime import datetime
+import logging
+
+from bert import tokenization as token
+from flask import jsonify
+from flask import Blueprint
+from flask import current_app as app
+from flask import request
 from ming import Field
 from ming import schema
 from ming import Session
 from ming import create_datastore
 from ming.declarative import Document
-import numpy
+import numpy as np
 import tensorflow as tf
 import tensorflow_hub as hub
 
@@ -14,8 +19,11 @@ import tensorflow_hub as hub
 # padded to equivalent vector lengths.
 MAX_SEQ_LENGTH = 256
 
-bind = create_datastore('tutorial')
+# TODO: Parameterize the MongoDB session for testing.
+bind = create_datastore('classifier_dev')
 session = Session(bind)
+
+embed_bp = Blueprint('embed_bp', __name__)
 
 
 class Embedding(Document):
@@ -23,7 +31,7 @@ class Embedding(Document):
 
     class __mongometa__:
         session = session
-        name = 'embedding_matrix'
+        name = 'embedding_cache'
 
     _id = Field(schema.ObjectId)
     bert = Field(schema.String)
@@ -48,13 +56,13 @@ class Embedder:
                 vocab_file=vocab_file,
                 do_lower_case=do_lower_case)
 
-    def GetEmbedding(self, seq: str):
+    def GetEmbedding(self, seq: str) -> np.array:
         # fetch from cache
         obj = Embedding.m.get(bert=self.bert, seq=seq)
         if obj:
             self.logger.info("Using embedding matrix fetched from MongoDB...")
-            # convert list back to numpyArray
-            matrix = numpy.array(obj.embedding)
+            # convert list back from list(floats) to np.array
+            matrix = np.array(obj.embedding)
             self.logger.debug(matrix)
             return matrix
 
@@ -63,15 +71,14 @@ class Embedder:
                          (self.bert, seq))
         matrix = self._buildEmbedding(seq)
 
-        # convert numpyArray to list for storage in MongoDB
+        # convert npArray to list for storage in MongoDB
         l_matrix = matrix.tolist()
-        e = Embedding.make(
-            dict(bert=self.bert, seq=seq, embedding=l_matrix))
+        e = Embedding.make(dict(bert=self.bert, seq=seq, embedding=l_matrix))
         e.m.save()
         self.logger.info("Embedding matrix stored in MongoDB.")
         return matrix
 
-    def _buildEmbedding(self, seq: str):
+    def _buildEmbedding(self, seq: str) -> np.array:
         tokens = self.tokenizer.tokenize(seq)
         if len(tokens) > MAX_SEQ_LENGTH - 2:
             tokens = tokens[:(MAX_SEQ_LENGTH - 2)]
@@ -114,5 +121,21 @@ class Embedder:
             sess.run([
                 tf.compat.v1.global_variables_initializer(),
                 tf.compat.v1.tables_initializer()])
-            out = sess.run(seq_output)[0][0:len(tokens)]
-            return out
+            out = sess.run(seq_output)[0][:len(tokens), :]
+
+        return out
+
+
+@embed_bp.route('/embed', methods=['POST'])
+def embed():
+    # request.get_json: {
+    #     "seq"="hello world",
+    #     "bert": "https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1"
+    # }
+    error = None
+    data = request.get_json()
+
+    e = Embedder(data['bert'])
+    matrix = e.GetEmbedding(data['seq'])
+
+    return jsonify(str(len(matrix)))

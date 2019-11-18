@@ -1,9 +1,15 @@
 from flask import request, abort, jsonify
-from app import app
+
 from app import tasks
 
+from flask import Blueprint
+from flask import current_app as app
 
-@app.route('/task', methods=['GET'])
+
+task_bp = Blueprint('task_bp', __name__)
+
+
+@task_bp.route('/task', methods=['GET'])
 def get_task():
     data = request.get_json()
     print(data)
@@ -13,7 +19,7 @@ def get_task():
     return jsonify({"status": t.status})
 
 
-@app.route('/task', methods=['POST'])
+@task_bp.route('/task', methods=['POST'])
 def push_task():
     data = request.get_json()
     print(data)
@@ -28,7 +34,7 @@ def push_task():
     return jsonify({"status": t.status})
 
 
-@app.route('/task', methods=['DELETE'])
+@task_bp.route('/task', methods=['DELETE'])
 def delete_task():
     data = request.get_json()
     print(data)

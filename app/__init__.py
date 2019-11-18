@@ -3,34 +3,37 @@ import os
 
 from flask import Flask, current_app
 
-from app import config
+from app import embedder
+from app import classifier
 
 
-CONFIG = {
-    "development": "app.config.DevelopmentConfig",
-    "test": "app.config.TestConfig",
-    "production": "app.config.ProductionConfig",
-    "default": "app.config.DevelopmentConfig",
-}
+def create_app():
+    app = Flask(__name__)
 
-app = Flask(__name__)
+    # initialize configuration values
+    config_name = os.getenv("FLASK_ENV", 'default')
+    app.logger.debug("Reading " + config_name + " configuration...")
+    app.logger.debug("App config:")
 
-# initialize configuration values
-config_name = os.getenv("FLASK_ENV", 'default')
-app.logger.debug("Reading " + config_name + " configuration...")
+    # hard-code some configuration
+    app.config["BASE_CLASSIFIER_DIR"] = "./classifier_models"
+    for k, v in app.config.items():
+        app.logger.debug("%s: %s" % (k, v))
 
-config_obj = CONFIG[config_name]
-app.logger.debug("config obj: " + config_obj)
-app.config.from_object(config_obj)
+    # configure logging
+    if not app.debug:
+        app.logger.setLevel(logging.INFO)
 
-if app.config.from_pyfile('config.py'):
-    app.logger.info("Successfully read instance configuration file.")
-app.logger.info("Flask config:")
-app.logger.info(app.config.items())
+    with app.app_context():
+        # Include our Routes
+        from . import classifier
+        from . import embedder
+        from . import model_fetcher
+        from . import task_routes
 
-# configure logging
-if not app.debug:
-    app.logger.setLevel(logging.INFO)
+        # Register Blueprints
+        app.register_blueprint(classifier.classify_bp)
+        app.register_blueprint(embedder.embed_bp)
+        app.register_blueprint(task_routes.task_bp)
 
-from app import routes  # nopep8
-from app import task_routes  # nopep8
+        return app
