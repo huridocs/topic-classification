@@ -1,9 +1,9 @@
 ### Add seqs
-POST http://localhost:5000/classification_sample?model=upr-info_issues HTTP/1.1
+POST http://localhost:5000/classification_sample?model=dummy_model HTTP/1.1
 content-type: application/json
 
 {
-    "entries": [
+    "samples": [
         {
             "seq": "hello world",
             "training_labels" : [{
@@ -20,10 +20,10 @@ content-type: application/json
 }
 
 ### Del seqs
-DELETE http://localhost:5000/classification_sample?model=upr-info_issues&seq=hello%20world HTTP/1.1
+DELETE http://localhost:5000/classification_sample?model=dummy_model&seq=hello%20world HTTP/1.1
 
 ### Del all
-DELETE http://localhost:5000/classification_sample?model=upr-info_issues&seq=* HTTP/1.1
+DELETE http://localhost:5000/classification_sample?model=dummy_model&seq=* HTTP/1.1
 
 
 

@@ -150,7 +150,7 @@ def classify():
 @classify_bp.route('/classification_sample', methods=['POST'])
 def add_sample():
     # request.args: &model=upr-info_issues
-    # request.get_json: {"entries": [{"seq"="hello world",
+    # request.get_json: {"samples": [{"seq"="hello world",
     #                                 "training_labels"=[{"topic":"Murder},{"topic": "Justice"}]},
     #                                ...] }
     error = None
@@ -160,14 +160,14 @@ def add_sample():
     if not args['model']:
         raise Exception('You need to pass &model=...')
 
-    for entry in data['entries']:
+    for sample in data['samples']:
         existing: ClassificationSample = ClassificationSample.query.get(
-            model=args['model'], seq=entry['seq'])
+            model=args['model'], seq=sample['seq'])
         if existing:
-            existing.training_labels = entry['training_labels']
+            existing.training_labels = sample['training_labels']
         else:
             n = ClassificationSample(
-                model=args['model'], seq=entry['seq'], training_labels=entry['training_labels'])
+                model=args['model'], seq=sample['seq'], training_labels=sample['training_labels'])
     session.flush()
     return ""
 
