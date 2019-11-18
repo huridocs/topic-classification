@@ -49,7 +49,7 @@ class Classifier:
 
     def _load_vocab(self, path_to_vocab: str):
         with open(path_to_vocab, 'r') as f:
-            self.vocab = [line.rstrip() for line in f.readlines() if line.rstrip() != '']
+            self.vocab = [line.rstrip() for line in f.readlines() if line.rstrip()]
 
     def classify(self, seqs: List[str], model_name: str, fixed_threshold: Optional[float] = None) \
             -> Dict[str, List[Tuple[str, float]]]:
@@ -78,7 +78,7 @@ class Classifier:
             self.instance_config.vocab))
 
         predictor = tf.contrib.predictor.from_saved_model(instance_dir)
-        embeddings = embedder.GetEmbedding(seqs)
+        embeddings = embedder.get_embedding(seqs)
         embedding_shape = embeddings[seqs[0]].shape
         all_embeddings = np.zeros([len(embeddings), MAX_SEQ_LENGTH, embedding_shape[1]])
         all_input_mask = np.zeros([len(embeddings), MAX_SEQ_LENGTH])
@@ -94,7 +94,7 @@ class Classifier:
 
         predictions = predictor(features)
         probabilities = predictions["probabilities"]
-        logging.getLogger().debug(probabilities)
+        self.logger.debug(probabilities)
 
         result: Dict[str, List[Tuple[str, float]]] = {}
         for i, (seq, _) in enumerate(embeddings.items()):
@@ -120,5 +120,5 @@ def classify():
 
     c = Classifier(app.config["BASE_CLASSIFIER_DIR"])
 
-    results = c.classify(data['seqs'] if 'seqs' in data else [data['seq']], args['model'])
+    results = c.classify(data['seqs'], args['model'])
     return jsonify(str(results))

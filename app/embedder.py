@@ -54,7 +54,7 @@ class Embedder:
                 vocab_file=vocab_file,
                 do_lower_case=do_lower_case)
 
-    def GetEmbedding(self, seqs: List[str]) -> Dict[str, np.array]:
+    def get_embedding(self, seqs: List[str]) -> Dict[str, np.array]:
         result: Dict[str, np.array] = {}
         undone_seqs: Set[str] = set()
 
@@ -77,7 +77,7 @@ class Embedder:
 
         self.logger.info("Building %d embedding matrics with TensorFlow..." %
                          (len(undone_seqs)))
-        done_seqs = self._buildEmbedding(undone_seqs)
+        done_seqs = self._build_embedding(undone_seqs)
 
         for seq, matrix in done_seqs.items():
             result[seq] = matrix
@@ -87,7 +87,7 @@ class Embedder:
         self.logger.info("Stored %d embedding matrices in MongoDB." % len(done_seqs))
         return result
 
-    def _buildEmbedding(self, seqs: Set[str]) -> Dict[str, np.array]:
+    def _build_embedding(self, seqs: Set[str]) -> Dict[str, np.array]:
         num_seqs = len(seqs)
         all_input_ids = np.zeros([num_seqs, MAX_SEQ_LENGTH])
         all_input_masks = np.zeros([num_seqs, MAX_SEQ_LENGTH])
@@ -156,9 +156,6 @@ def embed():
     data = request.get_json()
 
     e = Embedder(data['bert'])
-    if 'seq' in data:
-        ms = e.GetEmbedding([data['seq']])
-    elif 'seqs' in data:
-        ms = e.GetEmbedding(data['seqs'])
+    ms = e.get_embedding(data['seqs'])
     result = {seq: str(len(m)) for seq, m in ms.items()}
     return jsonify(result)

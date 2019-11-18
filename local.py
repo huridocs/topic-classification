@@ -28,7 +28,7 @@ def main(argv):
 
     if FLAGS.mode == "embed":
         e = embedder.Embedder(FLAGS.bert)
-        m = e.GetEmbedding([FLAGS.seq, FLAGS.seq + ' 2'])
+        m = e.get_embedding([FLAGS.seq, FLAGS.seq + ' 2'])
         print([(seq, len(m.tostring())) for seq, m in m.items()])
     elif FLAGS.mode == "classify":
         c = classifier.Classifier(FLAGS.classifier_dir)
