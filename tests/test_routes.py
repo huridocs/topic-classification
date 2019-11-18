@@ -21,8 +21,8 @@ def test_embed(app):
         resp = client.post(
             '/embed',
             data=json.dumps(
-                    {'seq': 'hello world!',
-                     'bert': ('https://tfhub.dev/google/'
-                              'bert_uncased_L-12_H-768_A-12/1')}),
+                {'seqs': ['hello world!'],
+                 'bert': ('https://tfhub.dev/google/'
+                          'bert_uncased_L-12_H-768_A-12/1')}),
             content_type='application/json')
     assert resp.status == '200 OK'

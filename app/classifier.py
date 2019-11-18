@@ -1,15 +1,15 @@
 import json
 import logging
+import os
 import string
 import time
-import os
+from typing import List, Tuple
 
-from flask import jsonify
-from flask import Blueprint
-from flask import current_app as app
-from flask import request
 import numpy as np
 import tensorflow as tf
+from flask import Blueprint
+from flask import current_app as app
+from flask import jsonify, request
 
 from app import embedder as e
 from app import model_config as mc
@@ -28,6 +28,7 @@ class Classifier:
             base_classifier_dir (str): the local path to the dir
                     containing all saved classifier models and their instances.
     """
+
     def __init__(self,
                  base_classifier_dir: str):
 
@@ -54,7 +55,7 @@ class Classifier:
         with open(relative_path_to_vocab, 'r') as f:
             self.vocab = f.readlines()
 
-    def classify(self, seq: str, model_name: str) -> [(str, float)]:
+    def classify(self, seq: str, model_name: str) -> List[Tuple[str, float]]:
         """ classify calculates and returns a particular sequence's topic probability vector.
 
         Parameters:
@@ -74,11 +75,11 @@ class Classifier:
         fq_instance_dir = os.path.join(model_config_path, self.instance)
         embedder = e.Embedder(self.instance_config.bert)
         self._load_vocab(os.path.join(
-                fq_instance_dir,
-                self.instance_config.vocab))
+            fq_instance_dir,
+            self.instance_config.vocab))
 
         predictor = tf.contrib.predictor.from_saved_model(fq_instance_dir)
-        embedding = embedder.GetEmbedding(seq)
+        embedding = embedder.GetEmbedding([seq])[seq]
         input_mask = [1] * embedding.shape[0]
 
         # classify seq, with its embedding matrix, using a specific model

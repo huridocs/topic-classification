@@ -28,8 +28,8 @@ def main(argv):
 
     if FLAGS.mode == "embed":
         e = embedder.Embedder(FLAGS.bert)
-        m = e.GetEmbedding(FLAGS.seq)
-        print(len(m.tostring()))
+        m = e.GetEmbedding([FLAGS.seq, FLAGS.seq + ' 2'])
+        print(m)
     elif FLAGS.mode == "classify":
         c = classifier.Classifier(FLAGS.classifier_dir)
         print(c.classify(FLAGS.seq, FLAGS.model))

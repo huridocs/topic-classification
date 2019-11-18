@@ -7,22 +7,21 @@
       "request": "launch",
       "module": "flask",
       "args": ["run", "--no-debugger", "--no-reload"],
-      "env": {
-        "FLASK_APP": "server.py",
-        "FLASK_ENV": "development",
-        "FLASK_DEBUG": "0"
-      },
       "jinja": true
+    },
+    {
+      "name": "local-debug",
+      "type": "python",
+      "request": "launch",
+      "program": "${workspaceFolder}/local.py",
+      "args": ["--mode=embed", "--seq=hello world"],
     },
     {
       "name": "test-this-file",
       "type": "python",
       "request": "launch",
-      "program": "${workspaceFolder}/venv/bin/nosetests",
+      "module": "pytest",
       "args": ["${file}"],
-      "env": {
-        "FLASK_ENV": "development"
-      },
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen"
     }

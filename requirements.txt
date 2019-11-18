@@ -17,3 +17,7 @@ pycodestyle
 autopep8
 ipython
 pytest
+pytest-env
+mypy
+# To install mypy in vscode, install the 'mypy' plugin and provide the 'mypyls' setting with an absolute path to your <workspace>/venv/bin/mypyls
+https://github.com/matangover/mypyls/archive/master.zip#egg=mypyls[default-mypy]
