@@ -128,6 +128,10 @@ class Embedder:
 
 @embed_bp.route('/embed', methods=['POST'])
 def embed():
+    # request.get_json: {
+    #     "seq"="hello world",
+    #     "bert": "https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1"
+    # }
     error = None
     data = request.get_json()
 

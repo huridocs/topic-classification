@@ -11,8 +11,8 @@ from flask import request
 import numpy as np
 import tensorflow as tf
 
-from app import embedder as e
-from app import model_config as mc
+from app.embedder import Embedder
+from app.model_config import InstanceConfig
 from app import model_fetcher
 
 # The magic ML threshold of values we're confident are relevant enough
@@ -34,24 +34,23 @@ class Classifier:
         self.logger = logging.getLogger()
         self.base_classifier_dir = base_classifier_dir
 
-    def _load_instance(
-            self, relative_path_to_model: str):
-        instances = os.listdir(relative_path_to_model)
+    def _load_instance(self, path_to_model: str):
+        instances = os.listdir(path_to_model)
         # pick the latest released instance
         for i in sorted(instances, reverse=True):
             with open(os.path.join(
-                    relative_path_to_model, i, "config.json")) as f:
+                    path_to_model, i, "config.json")) as f:
                 d = json.loads(f.read())
                 if d["is_released"]:
                     self.instance = i
-                    self.instance_config = mc.InstanceConfig(d)
+                    self.instance_config = InstanceConfig(d)
                     return
         raise Exception(
             "No valid instance of model found in %s, instances were %s" % (
-                relative_path_to_model, instances))
+                path_to_model, instances))
 
-    def _load_vocab(self, relative_path_to_vocab: str):
-        with open(relative_path_to_vocab, 'r') as f:
+    def _load_vocab(self, path_to_vocab: str):
+        with open(path_to_vocab, 'r') as f:
             self.vocab = f.readlines()
 
     def classify(self, seq: str, model_name: str) -> [(str, float)]:
@@ -71,13 +70,13 @@ class Classifier:
         model_config_path = os.path.join(self.base_classifier_dir, model_name)
         self._load_instance(model_config_path)
 
-        fq_instance_dir = os.path.join(model_config_path, self.instance)
-        embedder = e.Embedder(self.instance_config.bert)
+        instance_dir = os.path.join(model_config_path, self.instance)
+        embedder = Embedder(self.instance_config.bert)
         self._load_vocab(os.path.join(
-                fq_instance_dir,
+                instance_dir,
                 self.instance_config.vocab))
 
-        predictor = tf.contrib.predictor.from_saved_model(fq_instance_dir)
+        predictor = tf.contrib.predictor.from_saved_model(instance_dir)
         embedding = embedder.GetEmbedding(seq)
         input_mask = [1] * embedding.shape[0]
 
