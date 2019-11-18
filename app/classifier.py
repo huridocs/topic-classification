@@ -82,7 +82,7 @@ class Classifier:
 
     def _load_vocab(self, path_to_vocab: str):
         with open(path_to_vocab, 'r') as f:
-            self.vocab = [line.rstrip() for line in f.readlines() if line.rstrip() != '']
+            self.vocab = [line.rstrip() for line in f.readlines() if line.rstrip()]
 
     def classify(self, seqs: List[str], fixed_threshold: Optional[float] = None) \
             -> Dict[str, List[Tuple[str, float]]]:
@@ -100,7 +100,7 @@ class Classifier:
         if len(seqs) == 0:
             return {}
 
-        embeddings = self.embedder.GetEmbedding(seqs)
+        embeddings = self.embedder.get_embedding(seqs)
         embedding_shape = embeddings[seqs[0]].shape
         all_embeddings = np.zeros([len(embeddings), MAX_SEQ_LENGTH, embedding_shape[1]])
         all_input_mask = np.zeros([len(embeddings), MAX_SEQ_LENGTH])
@@ -116,7 +116,7 @@ class Classifier:
 
         predictions = self.predictor(features)
         probabilities = predictions["probabilities"]
-        logging.getLogger().debug(probabilities)
+        self.logger.debug(probabilities)
 
         result: Dict[str, List[Tuple[str, float]]] = {}
         for i, (seq, _) in enumerate(embeddings.items()):
@@ -143,7 +143,7 @@ def classify():
 
     c = Classifier(app.config["BASE_CLASSIFIER_DIR"], args['model'])
 
-    results = c.classify(data['seqs'] if 'seqs' in data else [data['seq']])
+    results = c.classify(data['seqs'])
     return jsonify(str(results))
 
 
