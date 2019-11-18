@@ -9,7 +9,7 @@ def test_classify(app):
         data = {'model': 'test_model'}
         resp = client.post(
             '/classify?model=test_model',
-            data=json.dumps({'seq': 'hello world!'}),
+            data=json.dumps({'seqs': ['hello world!']}),
             content_type='application/json')
     assert resp.status == '200 OK'
 
