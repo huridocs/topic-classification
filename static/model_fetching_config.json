@@ -1,5 +1,6 @@
 {
-    "in": {
+    "source": {
+        "google_acct_key_path": "./.credz/bert-classification-key.json",
         "bucket_name": "bert_classification_models",
         "model_name": "UPR_2percent_ps0",
         "bert": "https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1",
@@ -17,20 +18,20 @@
             "path": "multilabel/{model}/saved_model"
         }
     },
-    "out": {
+    "destination": {
         "base_dir": "classifier_models",
         "model_name": "UPR_2percent_ps0",
         "instance_name": "1573031002",
         "saved_model": {
             "name": "saved_model.pb",
-            "path": "multilabel/{model}/saved_model/{instance}"
+            "path": "{model}/{instance}"
         },
         "variables": {
-            "path": "multilabel/{model}/saved_model/{instance}/variables"
+            "path": "{model}/{instance}/variables"
         },
         "vocab": {
             "name": "label.vocab",
-            "path": "multilabel/{model}/saved_model/{instance}"
+            "path": "{model}/{instance}"
         }
     }
 }

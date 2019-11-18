@@ -11,8 +11,8 @@ from flask import request
 import numpy as np
 import tensorflow as tf
 
-from app import embedder
-from app import model_config as mc
+from app.embedder import Embedder
+from app.model_config import InstanceConfig
 from app import model_fetcher
 
 # The magic ML threshold of values we're confident are relevant enough
@@ -25,17 +25,9 @@ class Classifier:
     """ Classifier may classify a string sequence's topic probability vector.
 
         Parameters:
-            path_to_bert (str): the URL path to a BERT model e.g.
-                    http://tf.google.com/bert_uncased.
-            path_to_classifier (str): the local path to the dir
-                    containing a saved classifier model and its variables.
-            path_to_vocab (str): the local path to a vocab label file to
-                    be used in constructing human-readable topic classification
-                    output.
+            base_classifier_dir (str): the local path to the dir
+                    containing all saved classifier models and their instances.
     """
-
-    # TODO: The config should be per model, and should contain the bert and
-    # vocab paths, alleviating the need to respecify them here in init.
     def __init__(self,
                  path_to_bert: str,
                  path_to_classifier: str,
@@ -74,18 +66,31 @@ class Classifier:
             )
             raise
 
-    def classify(self, seq: str) -> [(str, float)]:
+    def classify(self, seq: str, model_name: str) -> [(str, float)]:
         """ classify calculates and returns a particular sequence's topic probability vector.
 
         Parameters:
             seq (str): The text sequence to be classified with this model.
+            model_name (str): the name of the training model (e.g.
+                    UPR_2percent_ps0)
 
         Returns:
             [(str, float)]: The topic probabilty vector in descending order,
                     with topics below the minimum threshold (default=0.4)
                     discarded.
         """
-        embedding = self.embedder.GetEmbedding(seq)
+
+        model_config_path = os.path.join(self.base_classifier_dir, model_name)
+        self._load_instance(model_config_path)
+
+        instance_dir = os.path.join(model_config_path, self.instance)
+        embedder = Embedder(self.instance_config.bert)
+        self._load_vocab(os.path.join(
+                instance_dir,
+                self.instance_config.vocab))
+
+        predictor = tf.contrib.predictor.from_saved_model(instance_dir)
+        embedding = embedder.GetEmbedding(seq)
         input_mask = [1] * embedding.shape[0]
 
         # classify seq, with its embedding matrix, using a specific model
@@ -94,9 +99,9 @@ class Classifier:
             "input_mask": np.expand_dims(input_mask, axis=0),
         }
 
-        predictions = self.predictor(features)
+        predictions = predictor(features)
         probabilities = predictions["probabilities"][0]
-        self.logger.debug(probabilities)
+        logging.getLogger().debug(probabilities)
 
         # map results back to topic strings, according to classifier metadata
         # e.g. [('education', 0.8), ('rights of the child', 0.9)]
@@ -116,23 +121,12 @@ class Classifier:
 
 @classify_bp.route('/classify', methods=['POST'])
 def classify():
-    # request.get_json: {"seq"="hello world"}
+    # request.get_json: {"seq"="hello world", "model"="upr_info_issues"}
     error = None
     data = request.get_json()
     args = request.args
 
-    model_config_path = app.config["MODEL_CONFIG_PATH"]
-    if args.get("model_config_path"):
-        model_config_path = args.get("model_config_path")
+    c = Classifier(app.config["BASE_CLASSIFIER_DIR"])
 
-    with open(model_config_path) as f:
-        d = json.loads(f.read())
-        src_config = mc.InConfig(d["in"])
-        dest_config = mc.OutConfig(d["out"])
-
-    c = Classifier(
-        src_config.bert,
-        dest_config.saved_model.directory,
-        dest_config.vocab.fqfn)
-    results = c.classify(data['seq'])
+    results = c.classify(data['seq'], args["model"])
     return jsonify(str(results))

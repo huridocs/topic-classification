@@ -5,15 +5,6 @@ from flask import Flask, current_app
 
 from app import embedder
 from app import classifier
-from app import flask_config
-
-
-CONFIG = {
-    "development": "app.flask_config.DevelopmentConfig",
-    "test": "app.flask_config.TestConfig",
-    "production": "app.flask_config.ProductionConfig",
-    "default": "app.flask_config.DevelopmentConfig",
-}
 
 
 def create_app():
@@ -22,22 +13,16 @@ def create_app():
     # initialize configuration values
     config_name = os.getenv("FLASK_ENV", 'default')
     app.logger.debug("Reading " + config_name + " configuration...")
+    app.logger.debug("App config:")
 
-    config_obj = CONFIG[config_name]
-    app.logger.debug("config obj: " + config_obj)
-    app.config.from_object(config_obj)
-
-    if app.config.from_pyfile('flask_config.py'):
-        app.logger.info("Successfully read instance configuration file.")
-    app.logger.info("Flask config:")
-    app.logger.info(app.config)
+    # hard-code some configuration
+    app.config["BASE_CLASSIFIER_DIR"] = "./classifier_models"
+    for k, v in app.config.items():
+        app.logger.debug("%s: %s" % (k, v))
 
     # configure logging
     if not app.debug:
         app.logger.setLevel(logging.INFO)
-
-    os.environ["GOOGLE_APPLICATION_CREDENTIALS"] = (
-        app.config["GOOGLE_ACCT_KEY_PATH"])
 
     with app.app_context():
         # Include our Routes

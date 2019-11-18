@@ -8,6 +8,7 @@ pytest_plugins = "pyfakefs"
 @pytest.fixture
 def app():
     app = create_app()
+    app.config.from_pyfile("../tests/flask_test_cfg.py")
     return app
 
 

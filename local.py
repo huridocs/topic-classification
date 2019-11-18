@@ -8,31 +8,19 @@ from app import model_fetcher
 from absl import app
 from absl import flags
 
-# TODO: Label models as "released" and remove hard-coded IDs here.
-DEFAULT_MODEL = "UPR_2percent_ps0"
-DEFAULT_INSTANCE = "1573031002"
-PATH_TO_CLASSIFIER = os.path.join(
-    os.getcwd(),
-    "classifier_models/multilabel/{model_name}/saved_model/{training_instance}")
-PATH_TO_VOCAB = os.path.join(PATH_TO_CLASSIFIER, "label.vocab")
-
 FLAGS = flags.FLAGS
 
 flags.DEFINE_string(
     "bert", "https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1", "The bert model to use")
 flags.DEFINE_string(
-    "classifier", PATH_TO_CLASSIFIER.format(
-        model_name=DEFAULT_MODEL, training_instance=DEFAULT_INSTANCE
-    ), "The classifier model to use.")
-flags.DEFINE_string(
-    "google_acct_key_path", "./.credz/BERT Classification-9a8b5ef88627.json",
-    "Where is the JSON file containing the Google Cloud Service account key?"
-)
-flags.DEFINE_string("vocab",
-                    PATH_TO_VOCAB.format(
-                        model_name=DEFAULT_MODEL, training_instance=DEFAULT_INSTANCE),
-                    "Where is label.vocab?")
+    "classifier_dir", "./classifier_models", "The dir containing classifier models.")
+flags.DEFINE_string("model", "UPR_2percent_ps0",
+                    "The model trained for a particular label set.")
 flags.DEFINE_string("seq", "", "The string sequence to process")
+flags.DEFINE_string("fetch_config_path", "./static/model_fetching_config.json",
+                    "Path to the JSON config file describe where to fetch "
+                    "saved models from and where to copy them to.")
+
 flags.DEFINE_enum("mode", "embed", ["embed", "classify", "prefetch"], "The operation to perform.")
 
 
@@ -43,11 +31,10 @@ def main(argv):
         m = e.GetEmbedding(FLAGS.seq)
         print(len(m.tostring()))
     elif FLAGS.mode == "classify":
-        c = classifier.Classifier(FLAGS.bert, FLAGS.classifier, FLAGS.vocab)
-        print(c.classify(FLAGS.seq))
+        c = classifier.Classifier(FLAGS.classifier_dir)
+        print(c.classify(FLAGS.seq, FLAGS.model))
     elif FLAGS.mode == "prefetch":
-        f = model_fetcher.Fetcher(
-            service_acct_key_path=FLAGS.google_acct_key_path)
+        f = model_fetcher.Fetcher(FLAGS.fetch_config_path)
         dst = f.fetchAll()
         for l in dst:
             print(l)
@@ -55,5 +42,5 @@ def main(argv):
 
 
 if __name__ == '__main__':
-    os.environ["TFHUB_CACHE_DIR"] = os.getcwd() + "/bert_models"
+    os.environ['TFHUB_CACHE_DIR'] = os.getcwd() + "/bert_models"
     app.run(main)

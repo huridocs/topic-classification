@@ -13,21 +13,20 @@ class Fetcher(object):
     """ Fetches classifier model files from Google Cloud Storage."""
 
     def __init__(self,
-                 config_path="./static/model_config.json",
-                 service_acct_key_path=None,
+                 config_path=None,
                  src_config=None, dest_config=None):
-        self.logger = logging.getLogger("app.logger")
-        self.client = storage.Client.from_service_account_json(
-            service_acct_key_path)
+        self.logger = logging.getLogger()
         if src_config and dest_config:
             self.src_config = src_config
             self.dst_config = dest_config
         else:
             with open(config_path) as f:
                 data = json.loads(f.read())
-                self.src_config = mc.InConfig(data["in"])
-                self.dst_config = mc.OutConfig(data["out"])
+                self.src_config = mc.InConfig(data["source"])
+                self.dst_config = mc.OutConfig(data["destination"])
 
+        self.client = storage.Client.from_service_account_json(
+            self.src_config.google_acct_key_path)
         self.bucket = self.client.get_bucket(self.src_config.bucket)
         os.makedirs(self.dst_config.base_dir, exist_ok=True)
 
