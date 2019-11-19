@@ -1,16 +1,16 @@
-from flask import request, abort, jsonify
+from typing import cast, Any
+
+from flask import Blueprint, abort
+from flask import current_app as app
+from flask import jsonify, request
 
 from app import tasks
-
-from flask import Blueprint
-from flask import current_app as app
-
 
 task_bp = Blueprint('task_bp', __name__)
 
 
 @task_bp.route('/task', methods=['GET'])
-def get_task():
+def get_task() -> Any:
     data = request.get_json()
     print(data)
     t = tasks.GetTask(data["name"])
@@ -20,7 +20,7 @@ def get_task():
 
 
 @task_bp.route('/task', methods=['POST'])
-def push_task():
+def push_task() -> Any:
     data = request.get_json()
     print(data)
     p = tasks.GetProvider(data["provider"])
@@ -35,7 +35,7 @@ def push_task():
 
 
 @task_bp.route('/task', methods=['DELETE'])
-def delete_task():
+def delete_task() -> Any:
     data = request.get_json()
     print(data)
     t = tasks.GetTask(data["name"])

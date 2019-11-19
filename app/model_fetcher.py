@@ -2,7 +2,7 @@ import json
 import logging
 import ntpath
 import os
-from typing import List
+from typing import List, Optional
 
 from flask import current_app as app
 from google.cloud import storage
@@ -14,13 +14,14 @@ class Fetcher(object):
     """ Fetches classifier model files from Google Cloud Storage."""
 
     def __init__(self,
-                 config_path=None,
-                 src_config=None, dest_config=None):
+                 config_path: Optional[str] = None,
+                 src_config: Optional[mc.InConfig] = None,
+                 dest_config: Optional[mc.OutConfig] = None):
         self.logger = logging.getLogger()
         if src_config and dest_config:
             self.src_config = src_config
             self.dst_config = dest_config
-        else:
+        elif config_path is not None:
             with open(config_path) as f:
                 data = json.loads(f.read())
                 self.src_config = mc.InConfig(data["source"])
@@ -31,7 +32,7 @@ class Fetcher(object):
         self.bucket = self.client.get_bucket(self.src_config.bucket)
         os.makedirs(self.dst_config.base_dir, exist_ok=True)
 
-    def _fetch(self, src_blob, dest_fqfn: str) -> List[str]:
+    def _fetch(self, src_blob: str, dest_fqfn: str) -> List[str]:
         blob = self.bucket.blob(src_blob)
 
         dest_file = dest_fqfn

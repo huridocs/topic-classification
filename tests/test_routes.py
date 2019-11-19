@@ -1,8 +1,10 @@
 import json
 import pytest
 
+from flask import Flask
 
-def test_classify(app):
+
+def test_classify(app: Flask) -> None:
     client = app.test_client()
 
     with app.test_request_context():
@@ -14,7 +16,7 @@ def test_classify(app):
     assert resp.status == '200 OK'
 
 
-def test_embed(app):
+def test_embed(app: Flask) -> None:
     client = app.test_client()
 
     with app.test_request_context():

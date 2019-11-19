@@ -7,7 +7,7 @@ from app import embedder
 from app import classifier
 
 
-def create_app():
+def create_app() -> Flask:
     app = Flask(__name__)
 
     # initialize configuration values

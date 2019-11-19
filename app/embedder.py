@@ -1,6 +1,6 @@
 import logging
 from datetime import datetime
-from typing import List, Set, Dict
+from typing import Any, List, Set, Dict
 
 import numpy as np
 import tensorflow as tf
@@ -12,7 +12,7 @@ from flask import jsonify, request
 from ming import schema
 from ming.odm import FieldProperty, MappedClass, Mapper
 
-from app.db import session
+from app.db import session, hasher
 
 # Used for making sure all sentences end up
 # padded to equivalent vector lengths.
@@ -27,11 +27,12 @@ class Embedding(MappedClass):
     class __mongometa__:
         session = session
         name = 'embedding_cache'
-        unique_indexes = [('bert', 'seq')]
+        unique_indexes = [('bert', 'seqHash')]
 
     _id = FieldProperty(schema.ObjectId)
     bert = FieldProperty(schema.String, required=True)
     seq = FieldProperty(schema.String, required=True)
+    seqHash = FieldProperty(schema.String, required=True)
     embedding = FieldProperty(schema.Array(schema.Array(schema.Float)), required=True)
     update_timestamp = FieldProperty(datetime, if_missing=datetime.utcnow)
 
@@ -56,23 +57,31 @@ class Embedder:
                 vocab_file=vocab_file,
                 do_lower_case=do_lower_case)
 
-    def get_embedding(self, seqs: List[str]) -> Dict[str, np.array]:
-        result: Dict[str, np.array] = {}
-        undone_seqs: Set[str] = set()
+    def get_embedding(self, seqs: List[str]) -> List[np.array]:
+        if len(seqs) == 0:
+            return []
+        if len(seqs) > 5000:
+            raise Exception('You should never handle more than 5000 berts at the same time!')
 
-        # fetch from cache
+        hashed_seq_to_index: Dict[str, int] = {}
         for i, seq in enumerate(seqs):
-            obj = Embedding.query.get(bert=self.bert, seq=seq)
-            if obj:
-                # convert list back from list(floats) to np.array
-                matrix = np.array(obj.embedding)
-                self.logger.debug(matrix)
-                result[seq] = matrix
-            else:
-                undone_seqs.add(seq)
+            hashed_seq_to_index[hasher(seq)] = i
+
+        result: List[np.array] = [None] * len(seqs)
+        # fetch from cache
+        self.logger.info('Looking up cache for %d seqs' % (len(seqs)))
+        for entry in Embedding.query.find(
+                dict(bert=self.bert,
+                     seqHash={'$in': list(hashed_seq_to_index.keys())})).all():
+            result[hashed_seq_to_index[entry.seqHash]] = np.array(entry.embedding)
+
+        undone_seqs: List[str] = []
+        for seq in seqs:
+            if result[hashed_seq_to_index[hasher(seq)]] is None:
+                undone_seqs.append(seq)
 
         self.logger.info("Using %d of %d embedding matrices fetched from MongoDB." %
-                         (len(result), len(seqs)))
+                         (len(seqs) - len(undone_seqs), len(seqs)))
         if len(undone_seqs) == 0:
             return result
 
@@ -80,15 +89,15 @@ class Embedder:
                          (len(undone_seqs)))
         done_seqs = self._build_embedding(undone_seqs)
 
-        for seq, matrix in done_seqs.items():
-            result[seq] = matrix
+        for seq, matrix in zip(undone_seqs, done_seqs):
+            result[hashed_seq_to_index[hasher(seq)]] = matrix
             # convert npArray to list for storage in MongoDB
-            e = Embedding(bert=self.bert, seq=seq, embedding=matrix.tolist())
+            e = Embedding(bert=self.bert, seq=seq, seqHash=hasher(seq), embedding=matrix.tolist())
         session.flush()
         self.logger.info("Stored %d embedding matrices in MongoDB." % len(done_seqs))
         return result
 
-    def _build_embedding(self, seqs: Set[str]) -> Dict[str, np.array]:
+    def _build_embedding(self, seqs: List[str]) -> List[np.array]:
         num_seqs = len(seqs)
         all_input_ids = np.zeros([num_seqs, MAX_SEQ_LENGTH])
         all_input_masks = np.zeros([num_seqs, MAX_SEQ_LENGTH])
@@ -141,14 +150,14 @@ class Embedder:
                 tf.compat.v1.global_variables_initializer(),
                 tf.compat.v1.tables_initializer()])
             all_embeddings = sess.run(seq_output)
-            out: Dict[str, np.ndarray] = {}
+            out: List[np.ndarray] = [None] * num_seqs
             for i, seq in enumerate(seqs):
-                out[seq] = all_embeddings[i][:int(sum(all_input_masks[i]))]
+                out[i] = all_embeddings[i][:int(sum(all_input_masks[i]))]
             return out
 
 
 @embed_bp.route('/embed', methods=['POST'])
-def embed():
+def embed() -> Any:
     # request.get_json: {
     #     "seq"="hello world",
     #     "bert": "https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1"
@@ -158,5 +167,5 @@ def embed():
 
     e = Embedder(data['bert'])
     ms = e.get_embedding(data['seqs'])
-    result = {seq: str(len(m)) for seq, m in ms.items()}
+    result = [str(len(m)) for m in ms]
     return jsonify(result)

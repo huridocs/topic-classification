@@ -1,15 +1,18 @@
 import threading
-from typing import Callable, Dict, Optional, Type
+from typing import Any, Callable, Dict, Optional, Type
 
 
 class StatusHolder:
-    def __init__(self):
+    def __init__(self) -> None:
         self.status = ""
         self.is_done = threading.Event()
 
 
 class TaskProvider:
-    def Run(self, status_holder: StatusHolder):
+    def __init__(self, json: Any) -> None:
+        pass
+
+    def Run(self, status_holder: StatusHolder) -> Any:
         pass
 
 
@@ -22,13 +25,13 @@ class _Task(StatusHolder):
         self.result = None
         self.thread: Optional[threading.Thread] = None
 
-    def Start(self):
+    def Start(self) -> None:
         if self.thread:
             raise RuntimeError("Don't call Start twice!")
         self.thread = threading.Thread(target=self._Run, daemon=True)
         self.thread.start()
 
-    def Stop(self, join=False):
+    def Stop(self, join: bool = False) -> None:
         if not self.thread:
             raise RuntimeError("Don't call Stop before Start!")
         if self.is_done.is_set():
@@ -37,7 +40,7 @@ class _Task(StatusHolder):
         if join:
             self.thread.join()
 
-    def _Run(self):
+    def _Run(self) -> None:
         self.status = "Started"
         self.result = self.provider.Run(self)
         self.status = "Done (" + self.status + ")"
@@ -52,14 +55,14 @@ tasks: Dict[str, _Task] = {}
 taskLock = threading.Lock()
 
 
-def GetTask(name: str):
+def GetTask(name: str) -> Optional[_Task]:
     with taskLock:
         if name in tasks:
             return tasks.get(name)
         return None
 
 
-def GetOrCreateTask(name: str, provider: TaskProvider):
+def GetOrCreateTask(name: str, provider: TaskProvider) -> _Task:
     with taskLock:
         existing_task = tasks.get(name)
         if existing_task and existing_task.is_done.is_set():
@@ -69,17 +72,17 @@ def GetOrCreateTask(name: str, provider: TaskProvider):
         return t
 
 
-def GetProvider(name: str):
+def GetProvider(name: str) -> Optional[Type[TaskProvider]]:
     if name not in providers:
         return None
     return providers[name]
 
 
 class _WaitTask(TaskProvider):
-    def __init__(self, json):
-        self.waitTime = json["time"] or 10.0
+    def __init__(self, json: Any):
+        self.waitTime = json['time'] or 10.0
 
-    def Run(self, status_holder: StatusHolder):
+    def Run(self, status_holder: StatusHolder) -> None:
         waited = 0.0
         while waited < self.waitTime:
             waitFor = min(self.waitTime - waited, 0.01)
