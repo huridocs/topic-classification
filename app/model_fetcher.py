@@ -4,7 +4,6 @@ import ntpath
 import os
 from typing import List, Optional
 
-from flask import current_app as app
 from google.cloud import storage
 
 from app import model_config as mc
@@ -24,8 +23,8 @@ class Fetcher(object):
         elif config_path is not None:
             with open(config_path) as f:
                 data = json.loads(f.read())
-                self.src_config = mc.InConfig(data["source"])
-                self.dst_config = mc.OutConfig(data["destination"])
+                self.src_config = mc.InConfig(data['source'])
+                self.dst_config = mc.OutConfig(data['destination'])
 
         self.client = storage.Client.from_service_account_json(
             self.src_config.google_acct_key_path)
@@ -53,9 +52,9 @@ class Fetcher(object):
                            self.dst_config.saved_model.fqfn)
 
     def fetchVariables(self) -> List[str]:
-        var_blob_dir = self.src_config.variables.directory + "/"
+        var_blob_dir = self.src_config.variables.directory + '/'
         blobs = list(self.bucket.list_blobs(
-            prefix=var_blob_dir, delimiter="/"))
+            prefix=var_blob_dir, delimiter='/'))
 
         new_files: List[str] = []
         for b in blobs:
@@ -64,8 +63,8 @@ class Fetcher(object):
             # Note: github.com/googleapis/google-cloud-python/issues/5163
             if blob.name == var_blob_dir:
                 self.logger.info(
-                    "Discarding blob with name equal to "
-                    "the directory prefix: %s" % b.name)
+                    'Discarding blob with name equal to '
+                    'the directory prefix: %s' % b.name)
                 continue
 
             dest_var_fqfn = os.path.join(
@@ -77,10 +76,10 @@ class Fetcher(object):
 
     def fetchAll(self) -> List[str]:
         return (
-            ["=====Model====="]
+            ['=====Model=====']
             + self.fetchModel()
-            + ["=====Label====="]
+            + ['=====Label=====']
             + self.fetchVocab()
-            + ["===Variables==="]
+            + ['===Variables===']
             + self.fetchVariables()
         )

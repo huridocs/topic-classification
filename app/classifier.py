@@ -1,10 +1,8 @@
 import json
 import logging
 import os
-import string
-import time
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Set
 
 import numpy as np
 import tensorflow as tf
@@ -14,7 +12,6 @@ from flask import jsonify, request
 from ming import schema
 from ming.odm import FieldProperty, MappedClass, Mapper
 
-from app import model_fetcher
 from app.db import hasher, session
 from app.embedder import MAX_SEQ_LENGTH, Embedder
 from app.model_config import InstanceConfig
@@ -35,9 +32,9 @@ class ClassificationSample(MappedClass):
     model = FieldProperty(schema.String, required=True)
     seq = FieldProperty(schema.String, required=True)
     seqHash = FieldProperty(schema.String, required=True)
-    training_labels = FieldProperty(schema.Array(schema.Object(fields={"topic": schema.String})))
+    training_labels = FieldProperty(schema.Array(schema.Object(fields={'topic': schema.String})))
     predicted_labels = FieldProperty(schema.Array(schema.Object(
-        fields={"topic": schema.String, "probability": schema.Float})))
+        fields={'topic': schema.String, 'probability': schema.Float})))
     update_timestamp = FieldProperty(datetime, if_missing=datetime.utcnow)
 
 
@@ -98,10 +95,10 @@ class TopicInfo:
         self.f1_quality = f1(best_precision)
 
     def __str__(self) -> str:
-        res = ["%s has %d train, best quality %.02f@t=%.02f" %
+        res = ['%s has %d train, best quality %.02f@t=%.02f' %
                (self.topic, self.num_samples, self.f1_quality, self.suggested_threshold)]
         for thres in self.thresholds.keys():
-            res.append("  t=%.02f -> %.02f@p%.01f" %
+            res.append('  t=%.02f -> %.02f@p%.01f' %
                        (self.thresholds[thres], self.recalls[thres], thres/100.0))
         return '\n'.join(res)
 
@@ -121,7 +118,7 @@ class Classifier:
         self.logger = logging.getLogger()
         if not os.path.isdir(base_classifier_dir):
             raise Exception(
-                "Invalid base_classifier_dir: %s" % base_classifier_dir)
+                'Invalid base_classifier_dir: %s' % base_classifier_dir)
         self.model_name = model_name
         self.model_config_path = os.path.join(base_classifier_dir, model_name)
         self.topic_infos: Dict[str, TopicInfo] = {}
@@ -132,14 +129,14 @@ class Classifier:
     def _load_instance_config(self) -> None:
         if not os.path.isdir(self.model_config_path):
             raise Exception(
-                "Invalid model path: %s" % self.model_config_path)
+                'Invalid model path: %s' % self.model_config_path)
         instances = os.listdir(self.model_config_path)
         # pick the latest released instance
         for i in sorted(instances, reverse=True):
             with open(os.path.join(
-                    self.model_config_path, i, "config.json")) as f:
+                    self.model_config_path, i, 'config.json')) as f:
                 d = json.loads(f.read())
-                if d["is_released"]:
+                if d['is_released']:
                     self.instance = i
                     self.instance_config = InstanceConfig(d)
                     self.instance_dir = os.path.join(self.model_config_path, self.instance)
@@ -147,7 +144,7 @@ class Classifier:
                     self._init_thresholds()
                     return
         raise Exception(
-            "No valid instance of model found in %s, instances were %s" % (
+            'No valid instance of model found in %s, instances were %s' % (
                 self.model_config_path, instances))
 
     def _init_vocab(self) -> None:
@@ -157,23 +154,23 @@ class Classifier:
                 self.vocab = [line.rstrip() for line in f.readlines() if line.rstrip()]
         except Exception as e:
             raise Exception(
-                "Failure to load vocab file from %s with exception: %s" % (path_to_vocab, e))
+                'Failure to load vocab file from %s with exception: %s' % (path_to_vocab, e))
 
     def _init_embedding(self) -> None:
         try:
             self.embedder = Embedder(self.instance_config.bert)
-        except Exception as e:
+        except Exception:
             self.logger.error(
-                "Failure to load embedding created using BERT model %s:" % self.instance_config.bert
+                'Failure to load embedding created using BERT model %s:' % self.instance_config.bert
             )
             raise
 
     def _init_predictor(self) -> None:
         try:
             self.predictor = tf.contrib.predictor.from_saved_model(self.instance_dir)
-        except Exception as e:
+        except Exception:
             self.logger.error(
-                "Failure to create predictor based on classifer at path %s" % self.instance_dir
+                'Failure to create predictor based on classifer at path %s' % self.instance_dir
             )
             raise
 
@@ -195,7 +192,7 @@ class Classifier:
                     self.topic_infos[topic] = TopicInfo(topic)
         except Exception as e:
             raise Exception(
-                "Failure to load thresholds file from %s with exception: %s" %
+                'Failure to load thresholds file from %s with exception: %s' %
                 (path_to_thresholds, e))
 
     def classify(self, seqs: List[str], use_thresholds: bool = True) \
@@ -214,9 +211,9 @@ class Classifier:
         if len(seqs) == 0:
             return []
         # Split very large requests into chunks since (intermediate) bert data is huge.
-        if len(seqs) > 5000:
-            return (self.classify(seqs[:5000], use_thresholds) +
-                    self.classify(seqs[5000:], use_thresholds))
+        if len(seqs) > 1000:
+            return (self.classify(seqs[:1000], use_thresholds) +
+                    self.classify(seqs[1000:], use_thresholds))
 
         embeddings = self.embedder.get_embedding(seqs)
         embedding_shape = embeddings[0].shape
@@ -228,12 +225,12 @@ class Classifier:
             all_input_mask[i][:len(matrix)] = 1
 
         features = {
-            "embeddings": all_embeddings,
-            "input_mask": all_input_mask,
+            'embeddings': all_embeddings,
+            'input_mask': all_input_mask,
         }
 
         predictions = self.predictor(features)
-        probabilities = predictions["probabilities"]
+        probabilities = predictions['probabilities']
         self.logger.debug(probabilities)
 
         result: List[Dict[str, float]] = [{}] * len(seqs)
@@ -282,12 +279,11 @@ class Classifier:
 @classify_bp.route('/classify', methods=['POST'])
 def classify() -> Any:
     # request.args: &model=upr-info_issues
-    # request.get_json: {"seq"="hello world"}
-    error = None
+    # request.get_json: {'seq'="hello world'}
     data = request.get_json()
     args = request.args
 
-    c = Classifier(app.config["BASE_CLASSIFIER_DIR"], args['model'])
+    c = Classifier(app.config['BASE_CLASSIFIER_DIR'], args['model'])
 
     results = c.classify(data['seqs'])
     return jsonify(results)
@@ -296,10 +292,9 @@ def classify() -> Any:
 @classify_bp.route('/classification_sample', methods=['POST'])
 def add_sample() -> Any:
     # request.args: &model=upr-info_issues
-    # request.get_json: {"samples": [{"seq"="hello world",
-    #                                 "training_labels"=[{"topic":"Murder},{"topic": "Justice"}]},
+    # request.get_json: {'samples': [{'seq'="hello world',
+    #                                 'training_labels'=[{'topic':"Murder},{'topic': 'Justice'}]},
     #                                ...] }
-    error = None
     data = request.get_json()
     args = request.args
 
@@ -318,7 +313,7 @@ def add_sample() -> Any:
         if existing:
             existing.training_labels = sample['training_labels']
         else:
-            n = ClassificationSample(
+            ClassificationSample(
                 model=args['model'], seq=sample['seq'], seqHash=seqHash,
                 training_labels=sample['training_labels'])
     session.flush()
@@ -328,7 +323,6 @@ def add_sample() -> Any:
 @classify_bp.route('/classification_sample', methods=['DELETE'])
 def delete_sample() -> Any:
     # request.args: &model=upr-info_issues&seq=*
-    error = None
     args = request.args
 
     if not args['model']:

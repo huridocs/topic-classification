@@ -1,15 +1,13 @@
 import logging
 import pickle
 from datetime import datetime
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List
 
 import numpy as np
 import tensorflow as tf
 import tensorflow_hub as hub
 from bert import tokenization as token
-from flask import Blueprint
-from flask import current_app as app
-from flask import jsonify, request
+from flask import Blueprint, jsonify, request
 from ming import schema
 from ming.odm import FieldProperty, MappedClass, Mapper
 
@@ -46,14 +44,14 @@ class Embedder:
     def __init__(self, bert: str):
         self.bert = bert
         self.tf_hub = hub.Module(bert, trainable=True)
-        self.logger = logging.getLogger("app.logger")
+        self.logger = logging.getLogger('app.logger')
 
-        t_info = self.tf_hub(signature="tokenization_info", as_dict=True)
+        t_info = self.tf_hub(signature='tokenization_info', as_dict=True)
         with tf.compat.v1.Session() as sess:
             # vocab_file is a BERT-global, stable mapping {tokens: ids}
             vocab_file, do_lower_case = sess.run(
-                [t_info["vocab_file"],
-                 t_info["do_lower_case"]])
+                [t_info['vocab_file'],
+                 t_info['do_lower_case']])
             self.tokenizer = token.FullTokenizer(
                 vocab_file=vocab_file,
                 do_lower_case=do_lower_case)
@@ -82,22 +80,22 @@ class Embedder:
             if result[hashed_seq_to_index[hasher(seq)]] is None:
                 undone_seqs.append(seq)
 
-        self.logger.info("Using %d of %d embedding matrices fetched from MongoDB." %
+        self.logger.info('Using %d of %d embedding matrices fetched from MongoDB.' %
                          (len(seqs) - len(undone_seqs), len(seqs)))
         if len(undone_seqs) == 0:
             return result
 
-        self.logger.info("Building %d embedding matrics with TensorFlow..." %
+        self.logger.info('Building %d embedding matrics with TensorFlow...' %
                          (len(undone_seqs)))
         done_seqs = self._build_embedding(undone_seqs)
 
         for seq, matrix in zip(undone_seqs, done_seqs):
             result[hashed_seq_to_index[hasher(seq)]] = matrix
             # convert npArray to list for storage in MongoDB
-            e = Embedding(bert=self.bert, seq=seq, seqHash=hasher(
+            Embedding(bert=self.bert, seq=seq, seqHash=hasher(
                 seq), embedding=pickle.dumps(matrix))
         session.flush()
-        self.logger.info("Stored %d embedding matrices in MongoDB." % len(done_seqs))
+        self.logger.info('Stored %d embedding matrices in MongoDB.' % len(done_seqs))
         return result
 
     def _build_embedding(self, seqs: List[str]) -> List[np.array]:
@@ -112,7 +110,7 @@ class Embedder:
                 tokens = tokens[:(MAX_SEQ_LENGTH - 2)]
 
             # CLS and SEP is a relic of multi-sentence pre-training
-            tokens = ["[CLS]"] + tokens + ["[SEP]"]
+            tokens = ['[CLS]'] + tokens + ['[SEP]']
 
             # segment_ids refers again to multi-sentence pre-training
             # TODO: maybe scrap
@@ -144,9 +142,9 @@ class Embedder:
                            input_mask=all_input_masks,
                            segment_ids=all_segment_ids)
         bert_outputs = self.tf_hub(
-            inputs=bert_inputs, signature="tokens", as_dict=True)
+            inputs=bert_inputs, signature='tokens', as_dict=True)
 
-        seq_output = bert_outputs["sequence_output"]
+        seq_output = bert_outputs['sequence_output']
 
         with tf.compat.v1.Session() as sess:
             sess.run([
@@ -162,10 +160,9 @@ class Embedder:
 @embed_bp.route('/embed', methods=['POST'])
 def embed() -> Any:
     # request.get_json: {
-    #     "seq"="hello world",
-    #     "bert": "https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1"
+    #     'seq'="hello world',
+    #     'bert': 'https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1"
     # }
-    error = None
     data = request.get_json()
 
     e = Embedder(data['bert'])

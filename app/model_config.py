@@ -1,8 +1,8 @@
 import os
-from typing import cast, Any, Dict, Optional
+from typing import Any, Dict, Optional, cast
 
 # This is the directory tree structure for models and their metadata inside of
-# Google Cloud Storage. The top-level item (e.g. "bert_classification_models")
+# Google Cloud Storage. The top-level item (e.g. 'bert_classification_models')
 # is called the 'bucket'.
 # .
 # └── bert_classification_models
@@ -41,25 +41,25 @@ class ModelConfig(object):
 class InstanceConfig(ModelConfig):
     @property
     def bert(self) -> str:
-        return cast(str, self.get_property("bert"))
+        return cast(str, self.get_property('bert'))
 
     @property
     def vocab(self) -> str:
-        return cast(str, self.get_property("vocab"))
+        return cast(str, self.get_property('vocab'))
 
     @property
     def is_released(self) -> bool:
-        return cast(bool, self.get_property("is_released"))
+        return cast(bool, self.get_property('is_released'))
 
     @property
     def description(self) -> str:
-        return cast(str, self.get_property("description"))
+        return cast(str, self.get_property('description'))
 
 
 class PathConfig(ModelConfig):
 
     def __init__(self, conf_dict: Dict[str, Any], model: str,
-                 instance: Optional[str] = None, prefix: str = ""):
+                 instance: Optional[str] = None, prefix: str = ''):
         ModelConfig.__init__(self, conf_dict)
         self.model = model
         self.instance = instance
@@ -69,13 +69,13 @@ class PathConfig(ModelConfig):
     def directory(self) -> str:
         folder = os.path.join(
             self.prefix,
-            self.get_property("path")).format(
+            self.get_property('path')).format(
                 model=self.model, instance=self.instance)
         return folder
 
     @property
     def filename(self) -> str:
-        return cast(str, self.get_property("name"))
+        return cast(str, self.get_property('name'))
 
     @property
     def fqfn(self) -> str:
@@ -90,39 +90,39 @@ class InConfig(ModelConfig):
 
     @property
     def google_acct_key_path(self) -> str:
-        return cast(str, self.get_property("google_acct_key_path"))
+        return cast(str, self.get_property('google_acct_key_path'))
 
     @property
     def bucket(self) -> str:
-        return cast(str, self.get_property("bucket_name"))
+        return cast(str, self.get_property('bucket_name'))
 
     @property
     def model_name(self) -> str:
-        return cast(str, self.get_property("model_name"))
+        return cast(str, self.get_property('model_name'))
 
     @property
     def bert(self) -> str:
-        return cast(str, self.get_property("bert"))
+        return cast(str, self.get_property('bert'))
 
     @property
     def instance_name(self) -> str:
-        return cast(str, self.get_property("instance_name"))
+        return cast(str, self.get_property('instance_name'))
 
     @property
     def saved_model(self) -> PathConfig:
         return PathConfig(
-            self.get_property("saved_model"),
+            self.get_property('saved_model'),
             self.model_name, self.instance_name)
 
     @property
     def variables(self) -> PathConfig:
         return PathConfig(
-            self.get_property("variables"),
+            self.get_property('variables'),
             self.model_name, self.instance_name)
 
     @property
     def vocab(self) -> PathConfig:
-        return PathConfig(self.get_property("vocab"), self.model_name)
+        return PathConfig(self.get_property('vocab'), self.model_name)
 
 
 # TODO: Deduplicate In and Out config classes.
@@ -130,28 +130,28 @@ class OutConfig(ModelConfig):
 
     @property
     def base_dir(self) -> str:
-        return cast(str, self.get_property("base_dir"))
+        return cast(str, self.get_property('base_dir'))
 
     @property
     def model_name(self) -> str:
-        return cast(str, self.get_property("model_name"))
+        return cast(str, self.get_property('model_name'))
 
     @property
     def instance_name(self) -> str:
-        return cast(str, self.get_property("instance_name"))
+        return cast(str, self.get_property('instance_name'))
 
     @property
     def saved_model(self) -> PathConfig:
         return PathConfig(
-            self.get_property("saved_model"),
-            self.get_property("model_name"),
-            instance=self.get_property("instance_name"),
+            self.get_property('saved_model'),
+            self.get_property('model_name'),
+            instance=self.get_property('instance_name'),
             prefix=self.base_dir)
 
     @property
     def variables(self) -> PathConfig:
         return PathConfig(
-            self.get_property("variables"),
+            self.get_property('variables'),
             self.model_name,
             instance=self.instance_name,
             prefix=self.base_dir)
@@ -159,7 +159,7 @@ class OutConfig(ModelConfig):
     @property
     def vocab(self) -> PathConfig:
         return PathConfig(
-            self.get_property("vocab"),
+            self.get_property('vocab'),
             self.model_name,
             instance=self.instance_name,
             prefix=self.base_dir)

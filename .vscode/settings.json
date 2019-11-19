@@ -3,5 +3,8 @@
     "python.linting.pycodestyleEnabled": true,
     "python.linting.enabled": true,
     "editor.tabSize": 4,
-    "editor.detectIndentation": false
+    "editor.detectIndentation": false,
+    "python.linting.flake8Enabled": true,
+    "python.linting.mypyEnabled": true,
+    "cornflakes.linter.executablePath": "venv/bin/flake8"
 }

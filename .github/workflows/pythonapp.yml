@@ -15,9 +15,6 @@ jobs:
     - name: Install dependencies
       run: |
         ./run install
-    - name: Lint with flake8
-      run: |
-        ./run lint
-    - name: Test with pytest
+    - name: Lint & Test
       run: |
         ./run test

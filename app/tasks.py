@@ -1,10 +1,10 @@
 import threading
-from typing import Any, Callable, Dict, Optional, Type
+from typing import Any, Dict, Optional, Type
 
 
 class StatusHolder:
     def __init__(self) -> None:
-        self.status = ""
+        self.status = ''
         self.is_done = threading.Event()
 
 
@@ -21,7 +21,7 @@ class _Task(StatusHolder):
         super().__init__()
         self.name = name
         self.provider = provider
-        self.status = "New"
+        self.status = 'New'
         self.result = None
         self.thread: Optional[threading.Thread] = None
 
@@ -41,9 +41,9 @@ class _Task(StatusHolder):
             self.thread.join()
 
     def _Run(self) -> None:
-        self.status = "Started"
+        self.status = 'Started'
         self.result = self.provider.Run(self)
-        self.status = "Done (" + self.status + ")"
+        self.status = 'Done (' + self.status + ')'
         self.is_done.set()
 
 
@@ -87,11 +87,11 @@ class _WaitTask(TaskProvider):
         while waited < self.waitTime:
             waitFor = min(self.waitTime - waited, 0.01)
             if status_holder.is_done.wait(waitFor):
-                status_holder.status = "Cancelled"
+                status_holder.status = 'Cancelled'
                 return
             waited += waitFor
-            status_holder.status = "Waited for %.2f s" % (waited)
-        status_holder.status = "End reached"
+            status_holder.status = 'Waited for %.2f s' % (waited)
+        status_holder.status = 'End reached'
 
 
-providers["Wait"] = _WaitTask
+providers['Wait'] = _WaitTask

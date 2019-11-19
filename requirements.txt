@@ -13,6 +13,9 @@ flask
 pip
 setuptools
 pycodestyle
+flake8
+flake8-quotes
+flake8-isort
 autopep8
 ipython
 pyfakefs

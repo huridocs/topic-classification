@@ -1,5 +1,6 @@
-from os import environ
 import hashlib
+from os import environ
+
 from ming import create_datastore
 from ming.odm import ThreadLocalODMSession
 
