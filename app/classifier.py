@@ -28,27 +28,43 @@ class Classifier:
             base_classifier_dir (str): the local path to the dir
                     containing all saved classifier models and their instances.
     """
-    def __init__(self,
-                 path_to_bert: str,
-                 path_to_classifier: str,
-                 path_to_vocab: str):
-        self.logger = logging.getLogger('app.logger')
-        self._init_vocab(path_to_vocab)
-        self._init_embedding(path_to_bert)
-        self._init_predictor(path_to_classifier)
+    def __init__(self, path_to_classifier: str):
+        self.logger = logging.getLogger()
+        if not os.path.isdir(path_to_classifier):
+            raise Exception(
+                    "Invalid path_to_classifier: %s" % path_to_classifier)
+        self.base_classifier_dir = path_to_classifier
+
+    def _load_instance_config(self, path_to_model: str):
+        if not os.path.isdir(path_to_model):
+            raise Exception(
+                "Invalid path_to_model: %s" % path_to_model)
+        instances = os.listdir(path_to_model)
+        # pick the latest released instance
+        for i in sorted(instances, reverse=True):
+            with open(os.path.join(
+                    path_to_model, i, "config.json")) as f:
+                d = json.loads(f.read())
+                if d["is_released"]:
+                    self.instance = i
+                    self.instance_config = InstanceConfig(d)
+                    return
+        raise Exception(
+            "No valid instance of model found in %s, instances were %s" % (
+                path_to_model, instances))
 
     def _init_vocab(self, path_to_vocab: str):
         try:
             with open(path_to_vocab, 'r') as f:
-                self.vocab = f.readlines()
+                self.vocab = [line.rstrip() for line in f.readlines() if line.rstrip()]
         except Exception as e:
-            self.logger.error(
-                "Failure to load vocab file from %s:" % path_to_vocab)
-            raise
+            raise Exception(
+                "Failure to load vocab file from %s with exception: %s" % (path_to_vocab, e))
 
     def _init_embedding(self, path_to_bert: str):
         try:
-            self.embedder = embedder.Embedder(path_to_bert)
+            self.embedder = Embedder(path_to_bert)
+
         except Exception as e:
             self.logger.error(
                 "Failure to load embedding created using BERT model %s:" % path_to_bert
@@ -81,16 +97,16 @@ class Classifier:
         """
 
         model_config_path = os.path.join(self.base_classifier_dir, model_name)
-        self._load_instance(model_config_path)
+        self._load_instance_config(model_config_path)
 
         instance_dir = os.path.join(model_config_path, self.instance)
-        embedder = Embedder(self.instance_config.bert)
-        self._load_vocab(os.path.join(
+        self._init_embedding(self.instance_config.bert)
+        self._init_vocab(os.path.join(
                 instance_dir,
                 self.instance_config.vocab))
 
-        predictor = tf.contrib.predictor.from_saved_model(instance_dir)
-        embedding = embedder.GetEmbedding(seq)
+        self._init_predictor(instance_dir)
+        embedding = self.embedder.GetEmbedding(seq)
         input_mask = [1] * embedding.shape[0]
 
         # classify seq, with its embedding matrix, using a specific model
@@ -99,7 +115,7 @@ class Classifier:
             "input_mask": np.expand_dims(input_mask, axis=0),
         }
 
-        predictions = predictor(features)
+        predictions = self.predictor(features)
         probabilities = predictions["probabilities"][0]
         logging.getLogger().debug(probabilities)
 

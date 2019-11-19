@@ -1,8 +1,16 @@
 import json
+import os
 import pytest
 
 
-def test_classify(app):
+def test_classify(app, fs):
+    base_classifier_path = "./testdata"
+    instance_path = os.path.join(
+        base_classifier_path,
+        "test_model",
+        "test_instance")
+    fs.add_real_directory(instance_path)
+
     client = app.test_client()
 
     with app.test_request_context():

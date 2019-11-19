@@ -1,44 +1,122 @@
+import os
+from pyfakefs import fake_filesystem
 import pytest
 import tensorflow as tf
 import tensorflow_hub as hub
 from unittest.mock import MagicMock
 from unittest.mock import patch
 
-from app import classifier as c
-from app import embedder as e
-
-
-def dummy_predictor(path):
-    return True
-
-
-def dummy_hub_module(path, trainable):
-    def f(signature=None,
-          as_dict=None): pass
-    return f
-
-
-def dummy_sess_run():
-    class dummy_sess:
-        def run(self): pass
-    return dummy_sess
-
-def dummy_embedder(path):
-    return True
+from app.classifier import Classifier
+from app.embedder import Embedder
 
 
 class TestClassifer:
-    @patch.object(tf.contrib.predictor, 'from_saved_model', dummy_predictor)
-    @patch.object(e, 'Embedder', dummy_embedder)
-    def test_initialize_ok(self, fs):
-        fs.create_file("path/to/bert")
+    BASE_CLASSIFIER_PATH = "./testdata"
 
-        fs.create_file("path/to/classifer/model")
-        fs.create_file("path/to/vocab.file")
-        classifier = c.Classifier(
-            "path/to/bert", "path/to/classifier/model", "path/to/vocab.file")
-        assert classifier.vocab is not None
-        assert classifier.embedder is not None
+    def test_initialize_ok(self):
+        c = Classifier("./testdata")
+        assert c
 
-        assert classifier.predictor is not None
+    def test_classify(self, fs):
+        fs.add_real_directory("./testdata/test_model/test_instance")
+        fs.add_real_directory("./testdata/test_model/test_instance_unreleased")
+        c = Classifier("./testdata")
 
+        result = c.classify("Where is my medical book?", "test_model")
+
+        assert c.vocab is not None
+        assert c.embedder is not None
+        assert c.predictor is not None
+
+        assert c.instance == "test_instance"
+        print(result)
+        assert result
+        for topic in result:
+            assert topic[0] in c.vocab
+
+    def test_missing_base_classify_dir(self):
+        fake_classifier_path = "./fake_testdata"
+        with pytest.raises(
+                Exception, match="Invalid path_to_classifier: ./fake_testdata"):
+            c = Classifier(fake_classifier_path)
+
+    def test_missing_model_dir(self):
+        c = Classifier(self.BASE_CLASSIFIER_PATH)
+        with pytest.raises(
+                Exception,
+                match="Invalid path_to_model: ./testdata/missing_model"):
+            c.classify("foo seq", "missing_model")
+
+    def test_missing_instance_dir(self, fs):
+        fs.add_real_directory("./testdata/test_model/test_instance_unreleased")
+        c = Classifier(self.BASE_CLASSIFIER_PATH)
+        with pytest.raises(
+                Exception,
+                match="No valid instance of model found in %s, instances were %s" % (
+                        os.path.join(self.BASE_CLASSIFIER_PATH, "test_model"),
+                        r"\[\'test_instance_unreleased\'\]")):
+            c.classify("foo seq", "test_model")
+
+    def test_missing_vocab_file(self, fs):
+        fs.add_real_directory("./testdata/test_model/test_instance")
+        fs.remove_object("./testdata/test_model/test_instance/label.vocab")
+        c = Classifier(self.BASE_CLASSIFIER_PATH)
+        with pytest.raises(
+                Exception,
+                match=(r"Failure to load vocab file from {0} with exception"
+                       ).format("./testdata/test_model/test_instance/label.vocab")
+                ):
+            c.classify("foo seq", "test_model")
+
+    def test_invalid_bert(self, fs):
+        bad_bert_path = "./bad/path/to/bert"
+        config = """
+        {
+            "bert": "%s",
+            "vocab": "label.vocab",
+            "is_released": true,
+            "description": "This is the latest model from Sascha.",
+            "metadata": {
+                "thesaurus": "issues"
+            }
+        }
+        """ % (bad_bert_path)
+        fs.add_real_directory("./testdata/test_model/test_instance")
+        fs.remove_object("./testdata/test_model/test_instance/config.json")
+        fs.create_file("./testdata/test_model/test_instance/config.json",
+                       contents=config)
+        c = Classifier(self.BASE_CLASSIFIER_PATH)
+        with pytest.raises(
+                Exception,
+                match=r"unsupported handle format '{0}'".format(bad_bert_path)):
+            c.classify("foo seq", "test_model")
+
+    def test_missing_model(self, fs):
+        instance_path = os.path.join(
+            self.BASE_CLASSIFIER_PATH, "test_model", "test_instance_missing_model")
+        fs.add_real_directory(instance_path)
+
+        c = Classifier(self.BASE_CLASSIFIER_PATH)
+        with pytest.raises(
+                Exception,
+                match=(
+                        "SavedModel file does not exist at: {0}"
+                      ).format(instance_path)
+                ):
+            c.classify("foo seq", "test_model")
+
+    def test_missing_variables(self, fs):
+        instance_path = os.path.join(
+            self.BASE_CLASSIFIER_PATH,
+            "test_model",
+            "test_instance_missing_variables")
+        fs.add_real_directory(instance_path)
+
+        c = Classifier(self.BASE_CLASSIFIER_PATH)
+        with pytest.raises(
+                Exception,
+                match=(
+                        "{0}/variables; No such file or directory".format(
+                            instance_path)
+                )):
+            c.classify("foo seq", "test_model")
