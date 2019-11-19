@@ -4,9 +4,8 @@ import pytest
 
 
 def test_classify(app, fs):
-    base_classifier_path = "./testdata"
     instance_path = os.path.join(
-        base_classifier_path,
+        app.config["BASE_CLASSIFIER_DIR"],
         "test_model",
         "test_instance")
     fs.add_real_directory(instance_path)

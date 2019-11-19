@@ -33,8 +33,8 @@ class TestClassifer:
         assert result
         # result ~ {'seq': [(topic, probability), (topic2, probability)...], ...}
         for seq, prob_vector in result.items():
-            for topic in prob_vector:
-                assert topic[0] in c.vocab
+            for topic, _ in prob_vector:
+                assert topic in c.vocab
 
     def test_missing_base_classify_dir(self) -> None:
         fake_classifier_path = "./fake_testdata"
