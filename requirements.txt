@@ -15,6 +15,7 @@ setuptools
 pycodestyle
 autopep8
 ipython
+pyfakefs
 pytest
 pytest-env
 mypy
