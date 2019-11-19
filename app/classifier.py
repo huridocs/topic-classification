@@ -1,22 +1,19 @@
 import json
 import logging
+import os
 import string
 import time
-import os
+from typing import List, Tuple, Dict, Optional
 
-from flask import jsonify
-from flask import Blueprint
-from flask import current_app as app
-from flask import request
 import numpy as np
 import tensorflow as tf
+from flask import Blueprint
+from flask import current_app as app
+from flask import jsonify, request
 
-from app.embedder import Embedder
+from app.embedder import Embedder, MAX_SEQ_LENGTH
 from app.model_config import InstanceConfig
 from app import model_fetcher
-
-# The magic ML threshold of values we're confident are relevant enough
-RETAIN_THRESHOLD = 0.4
 
 classify_bp = Blueprint('classify_bp', __name__)
 
@@ -28,6 +25,7 @@ class Classifier:
             base_classifier_dir (str): the local path to the dir
                     containing all saved classifier models and their instances.
     """
+
     def __init__(self,
                  base_classifier_dir: str):
 
@@ -51,21 +49,24 @@ class Classifier:
 
     def _load_vocab(self, path_to_vocab: str):
         with open(path_to_vocab, 'r') as f:
-            self.vocab = f.readlines()
+            self.vocab = [line.rstrip() for line in f.readlines() if line.rstrip()]
 
-    def classify(self, seq: str, model_name: str) -> [(str, float)]:
-        """ classify calculates and returns a particular sequence's topic probability vector.
+    def classify(self, seqs: List[str], model_name: str, fixed_threshold: Optional[float] = None) \
+            -> Dict[str, List[Tuple[str, float]]]:
+        """ classify calculates and returns all the sequences' topic probability vectors.
 
         Parameters:
-            seq (str): The text sequence to be classified with this model.
-            model_name (str): the name of the training model (e.g.
-                    UPR_2percent_ps0)
+            seqs ([str]): The text sequences to be classified with this model.
+            model_name (str): the name of the training model (e.g. UPR_2percent_ps0).
+            fixed_threshold (float or None): if set, apply the same threshold to all topics.
 
         Returns:
-            [(str, float)]: The topic probabilty vector in descending order,
-                    with topics below the minimum threshold (default=0.4)
+            {str: [(str, float)]}: Per sequence, the topic probabilty vector in descending
+                    order, with topics below the minimum threshold (default=topic-dependent)
                     discarded.
         """
+        if len(seqs) == 0:
+            return {}
 
         model_config_path = os.path.join(self.base_classifier_dir, model_name)
         self._load_instance(model_config_path)
@@ -73,37 +74,41 @@ class Classifier:
         instance_dir = os.path.join(model_config_path, self.instance)
         embedder = Embedder(self.instance_config.bert)
         self._load_vocab(os.path.join(
-                instance_dir,
-                self.instance_config.vocab))
+            instance_dir,
+            self.instance_config.vocab))
 
         predictor = tf.contrib.predictor.from_saved_model(instance_dir)
-        embedding = embedder.GetEmbedding(seq)
-        input_mask = [1] * embedding.shape[0]
+        embeddings = embedder.get_embedding(seqs)
+        embedding_shape = embeddings[seqs[0]].shape
+        all_embeddings = np.zeros([len(embeddings), MAX_SEQ_LENGTH, embedding_shape[1]])
+        all_input_mask = np.zeros([len(embeddings), MAX_SEQ_LENGTH])
 
-        # classify seq, with its embedding matrix, using a specific model
+        for i, (_, matrix) in enumerate(embeddings.items()):
+            all_embeddings[i][:len(matrix)] = matrix
+            all_input_mask[i][:len(matrix)] = 1
+
         features = {
-            "embeddings": np.expand_dims(embedding, axis=0),
-            "input_mask": np.expand_dims(input_mask, axis=0),
+            "embeddings": all_embeddings,
+            "input_mask": all_input_mask,
         }
 
         predictions = predictor(features)
-        probabilities = predictions["probabilities"][0]
-        logging.getLogger().debug(probabilities)
+        probabilities = predictions["probabilities"]
+        self.logger.debug(probabilities)
 
-        # map results back to topic strings, according to classifier metadata
-        # e.g. [('education', 0.8), ('rights of the child', 0.9)]
-        topic_probs = list(zip(
-            (topic.rstrip() for topic in self.vocab),
-            probabilities))
-        # sort the results in descending order of topic probability
-        topic_probs.sort(key=lambda tup: tup[1], reverse=True)
-
-        # discard all topic probability tuples who are too unlikely
-        topic_probs = [o for o in topic_probs if o[1] > RETAIN_THRESHOLD]
-        self.logger.info(
-            "Filtered %d results that were at or below the precision "
-            "threshold." % (len(self.vocab) - len(topic_probs)))
-        return topic_probs
+        result: Dict[str, List[Tuple[str, float]]] = {}
+        for i, (seq, _) in enumerate(embeddings.items()):
+            # map results back to topic strings, according to classifier metadata
+            # e.g. [('education', 0.8), ('rights of the child', 0.9)]
+            topic_probs: List[Tuple[str, float]] = list(zip(self.vocab,
+                                                            probabilities[i]))
+            # sort the results in descending order of topic probability
+            topic_probs.sort(key=lambda tup: tup[1], reverse=True)
+            if fixed_threshold:
+                # discard all topic probability tuples who are too unlikely
+                topic_probs = [o for o in topic_probs if o[1] > fixed_threshold]
+            result[seq] = topic_probs
+        return result
 
 
 @classify_bp.route('/classify', methods=['POST'])
@@ -115,5 +120,5 @@ def classify():
 
     c = Classifier(app.config["BASE_CLASSIFIER_DIR"])
 
-    results = c.classify(data['seq'], args["model"])
+    results = c.classify(data['seqs'], args['model'])
     return jsonify(str(results))
