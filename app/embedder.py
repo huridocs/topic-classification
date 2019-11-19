@@ -1,6 +1,7 @@
 import logging
+import pickle
 from datetime import datetime
-from typing import Any, List, Set, Dict
+from typing import Any, Dict, List, Set
 
 import numpy as np
 import tensorflow as tf
@@ -12,7 +13,7 @@ from flask import jsonify, request
 from ming import schema
 from ming.odm import FieldProperty, MappedClass, Mapper
 
-from app.db import session, hasher
+from app.db import hasher, session
 
 # Used for making sure all sentences end up
 # padded to equivalent vector lengths.
@@ -30,10 +31,10 @@ class Embedding(MappedClass):
         unique_indexes = [('bert', 'seqHash')]
 
     _id = FieldProperty(schema.ObjectId)
-    bert = FieldProperty(schema.String, required=True)
-    seq = FieldProperty(schema.String, required=True)
-    seqHash = FieldProperty(schema.String, required=True)
-    embedding = FieldProperty(schema.Array(schema.Array(schema.Float)), required=True)
+    bert = FieldProperty(schema.String)
+    seq = FieldProperty(schema.String)
+    seqHash = FieldProperty(schema.String)
+    embedding = FieldProperty(schema.Binary)
     update_timestamp = FieldProperty(datetime, if_missing=datetime.utcnow)
 
 
@@ -72,8 +73,9 @@ class Embedder:
         self.logger.info('Looking up cache for %d seqs' % (len(seqs)))
         for entry in Embedding.query.find(
                 dict(bert=self.bert,
-                     seqHash={'$in': list(hashed_seq_to_index.keys())})).all():
-            result[hashed_seq_to_index[entry.seqHash]] = np.array(entry.embedding)
+                     seqHash={'$in': list(hashed_seq_to_index.keys())}),
+                projection=('seqHash', 'embedding')):
+            result[hashed_seq_to_index[entry.seqHash]] = pickle.loads(entry.embedding)
 
         undone_seqs: List[str] = []
         for seq in seqs:
@@ -92,7 +94,8 @@ class Embedder:
         for seq, matrix in zip(undone_seqs, done_seqs):
             result[hashed_seq_to_index[hasher(seq)]] = matrix
             # convert npArray to list for storage in MongoDB
-            e = Embedding(bert=self.bert, seq=seq, seqHash=hasher(seq), embedding=matrix.tolist())
+            e = Embedding(bert=self.bert, seq=seq, seqHash=hasher(
+                seq), embedding=pickle.dumps(matrix))
         session.flush()
         self.logger.info("Stored %d embedding matrices in MongoDB." % len(done_seqs))
         return result
