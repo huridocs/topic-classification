@@ -1,0 +1,11 @@
+{
+    "bert": "https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1",
+    "vocab": "label.vocab",
+    "is_released": true,
+    "description": "This is a model instance for tests (from UPR_2percent_ps0)",
+    "metadata": {
+        "thesaurus": "issues"
+    }
+
+}
+

@@ -60,6 +60,8 @@ class TopicInfo:
         self.recalls = {int(k): v for k, v in self.recalls.items()}
 
     def get_quality(self, prob: float) -> float:
+        if len(self.thresholds) == 0:
+            return prob
         quality = 0.0
         for precision_100, threshold in self.thresholds.items():
             if prob > threshold:
@@ -117,14 +119,20 @@ class Classifier:
                  base_classifier_dir: str,
                  model_name: str):
         self.logger = logging.getLogger()
+        if not os.path.isdir(base_classifier_dir):
+            raise Exception(
+                "Invalid base_classifier_dir: %s" % base_classifier_dir)
         self.model_name = model_name
         self.model_config_path = os.path.join(base_classifier_dir, model_name)
         self.topic_infos: Dict[str, TopicInfo] = {}
-        self._load_instance()
-        self.embedder = Embedder(self.instance_config.bert)
-        self.predictor = tf.contrib.predictor.from_saved_model(self.instance_dir)
+        self._load_instance_config()
+        self._init_embedding()
+        self._init_predictor()
 
-    def _load_instance(self) -> None:
+    def _load_instance_config(self) -> None:
+        if not os.path.isdir(self.model_config_path):
+            raise Exception(
+                "Invalid model path: %s" % self.model_config_path)
         instances = os.listdir(self.model_config_path)
         # pick the latest released instance
         for i in sorted(instances, reverse=True):
@@ -135,33 +143,60 @@ class Classifier:
                     self.instance = i
                     self.instance_config = InstanceConfig(d)
                     self.instance_dir = os.path.join(self.model_config_path, self.instance)
-                    self._load_vocab()
-                    self._load_thresholds()
+                    self._init_vocab()
+                    self._init_thresholds()
                     return
         raise Exception(
             "No valid instance of model found in %s, instances were %s" % (
                 self.model_config_path, instances))
 
-    def _load_vocab(self) -> None:
+    def _init_vocab(self) -> None:
         path_to_vocab = os.path.join(self.instance_dir, self.instance_config.vocab)
-        with open(path_to_vocab, 'r') as f:
-            self.vocab = [line.rstrip() for line in f.readlines() if line.rstrip()]
+        try:
+            with open(path_to_vocab, 'r') as f:
+                self.vocab = [line.rstrip() for line in f.readlines() if line.rstrip()]
+        except Exception as e:
+            raise Exception(
+                "Failure to load vocab file from %s with exception: %s" % (path_to_vocab, e))
 
-    def _load_thresholds(self) -> None:
+    def _init_embedding(self) -> None:
+        try:
+            self.embedder = Embedder(self.instance_config.bert)
+        except Exception as e:
+            self.logger.error(
+                "Failure to load embedding created using BERT model %s:" % self.instance_config.bert
+            )
+            raise
+
+    def _init_predictor(self) -> None:
+        try:
+            self.predictor = tf.contrib.predictor.from_saved_model(self.instance_dir)
+        except Exception as e:
+            self.logger.error(
+                "Failure to create predictor based on classifer at path %s" % self.instance_dir
+            )
+            raise
+
+    def _init_thresholds(self) -> None:
         path_to_thresholds = os.path.join(self.instance_dir, 'thresholds.json')
-        if not os.path.exists(path_to_thresholds):
-            self.logger.warn(('The model at %s does not have thresholds, ' +
-                              'consider ./run local --mode thresholds --model %s') %
-                             (self.instance_dir, self.model_name))
-        else:
-            with open(path_to_thresholds, 'r') as f:
-                for k, v in json.load(f).items():
-                    ti = TopicInfo(k)
-                    ti.load_json(v)
-                    self.topic_infos[k] = ti
-        for topic in self.vocab:
-            if topic not in self.topic_infos:
-                self.topic_infos[topic] = TopicInfo(topic)
+        try:
+            if not os.path.exists(path_to_thresholds):
+                self.logger.warn(('The model at %s does not have thresholds, ' +
+                                  'consider ./run local --mode thresholds --model %s') %
+                                 (self.instance_dir, self.model_name))
+            else:
+                with open(path_to_thresholds, 'r') as f:
+                    for k, v in json.load(f).items():
+                        ti = TopicInfo(k)
+                        ti.load_json(v)
+                        self.topic_infos[k] = ti
+            for topic in self.vocab:
+                if topic not in self.topic_infos:
+                    self.topic_infos[topic] = TopicInfo(topic)
+        except Exception as e:
+            raise Exception(
+                "Failure to load thresholds file from %s with exception: %s" %
+                (path_to_thresholds, e))
 
     def classify(self, seqs: List[str], use_thresholds: bool = True) \
             -> List[Dict[str, float]]:

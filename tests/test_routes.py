@@ -1,10 +1,19 @@
 import json
+import os
+
 import pytest
-
 from flask import Flask
+from pyfakefs.fake_filesystem import FakeFilesystem
 
 
-def test_classify(app: Flask) -> None:
+def test_classify(app: Flask, fs: FakeFilesystem) -> None:
+    base_classifier_path = "./testdata"
+    instance_path = os.path.join(
+        base_classifier_path,
+        "test_model",
+        "test_instance")
+    fs.add_real_directory(instance_path)
+
     client = app.test_client()
 
     with app.test_request_context():

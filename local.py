@@ -19,7 +19,8 @@ flags.DEFINE_string(
     "classifier_dir", "./classifier_models", "The dir containing classifier models.")
 flags.DEFINE_string("model", "UPR_2percent_ps0",
                     "The model trained for a particular label set.")
-flags.DEFINE_string("seq", "", "The string sequence to process")
+flags.DEFINE_string("seq", "increase efforts to end forced disappearance",
+                    "The string sequence to process")
 flags.DEFINE_string("fetch_config_path", "./static/model_fetching_config.json",
                     "Path to the JSON config file describe where to fetch "
                     "saved models from and where to copy them to.")
@@ -32,7 +33,7 @@ flags.DEFINE_enum("mode", "embed", ["embed", "classify",
 def main(_: Any) -> None:
     if FLAGS.mode == "embed":
         e = embedder.Embedder(FLAGS.bert)
-        seqs = [FLAGS.seq]
+        seqs = [FLAGS.seq, FLAGS.seq + ' 2']
         ms = e.get_embedding(seqs)
         print([(seq, len(m.tostring())) for seq, m in zip(seqs, ms)])
     elif FLAGS.mode == "classify":

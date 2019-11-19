@@ -5,6 +5,8 @@ from flask import Flask
 
 from app import create_app
 
+pytest_plugins = "pyfakefs"
+
 
 @pytest.fixture
 def app() -> Flask:
