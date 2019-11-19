@@ -255,7 +255,7 @@ def classify() -> Any:
     c = Classifier(app.config["BASE_CLASSIFIER_DIR"], args['model'])
 
     results = c.classify(data['seqs'])
-    return jsonify(str(results))
+    return jsonify(results)
 
 
 @classify_bp.route('/classification_sample', methods=['POST'])

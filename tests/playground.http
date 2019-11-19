@@ -25,7 +25,16 @@ DELETE http://localhost:5000/classification_sample?model=dummy_model&seq=hello%2
 ### Del all
 DELETE http://localhost:5000/classification_sample?model=dummy_model&seq=* HTTP/1.1
 
+### Classify
+POST http://localhost:5000/classify?model=upr-info-issues HTTP/1.1
+content-type: application/json
 
+{
+    "seqs": [
+        "continue to defend children's rights",
+        "implement measures against enforced disappearance"
+    ]
+}
 
 ### POST
 POST http://localhost:5000/task HTTP/1.1
