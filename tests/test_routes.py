@@ -17,7 +17,7 @@ def test_classify(app, fs):
         data = {'model': 'test_model'}
         resp = client.post(
             '/classify?model=test_model',
-            data=json.dumps({'seq': 'hello world!'}),
+            data=json.dumps({'seqs': ['hello world!']}),
             content_type='application/json')
     assert resp.status == '200 OK'
 
@@ -29,8 +29,8 @@ def test_embed(app):
         resp = client.post(
             '/embed',
             data=json.dumps(
-                    {'seq': 'hello world!',
-                     'bert': ('https://tfhub.dev/google/'
-                              'bert_uncased_L-12_H-768_A-12/1')}),
+                {'seqs': ['hello world!'],
+                 'bert': ('https://tfhub.dev/google/'
+                          'bert_uncased_L-12_H-768_A-12/1')}),
             content_type='application/json')
     assert resp.status == '200 OK'

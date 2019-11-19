@@ -1,12 +1,5 @@
 import threading
-from typing import Callable
-
-# Registered providers.
-providers = {}
-
-# Instantiated tasks.
-tasks = {}
-taskLock = threading.Lock()
+from typing import Callable, Dict, Optional, Type
 
 
 class StatusHolder:
@@ -27,7 +20,7 @@ class _Task(StatusHolder):
         self.provider = provider
         self.status = "New"
         self.result = None
-        self.thread = None
+        self.thread: Optional[threading.Thread] = None
 
     def Start(self):
         if self.thread:
@@ -51,6 +44,14 @@ class _Task(StatusHolder):
         self.is_done.set()
 
 
+# Registered providers.
+providers: Dict[str, Type[TaskProvider]] = {}
+
+# Instantiated tasks.
+tasks: Dict[str, _Task] = {}
+taskLock = threading.Lock()
+
+
 def GetTask(name: str):
     with taskLock:
         if name in tasks:
@@ -60,8 +61,9 @@ def GetTask(name: str):
 
 def GetOrCreateTask(name: str, provider: TaskProvider):
     with taskLock:
-        if name in tasks and not tasks.get(name).is_done.is_set():
-            return tasks.get(name)
+        existing_task = tasks.get(name)
+        if existing_task and existing_task.is_done.is_set():
+            return existing_task
         t = _Task(name, provider)
         tasks[name] = t
         return t

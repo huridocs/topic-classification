@@ -12,6 +12,8 @@ To install, run
 ./run install
 ```
 
+**Optional**: Install GPU support with `./run pip install tensorflow-gpu==1.15.0`.
+
 ## Setup
 
 The code requires a BERT(-like) model to produce sequence (sentence / paragraph) embeddings.

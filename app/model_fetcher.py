@@ -2,6 +2,7 @@ import json
 import logging
 import ntpath
 import os
+from typing import List
 
 from flask import current_app as app
 from google.cloud import storage
@@ -30,7 +31,7 @@ class Fetcher(object):
         self.bucket = self.client.get_bucket(self.src_config.bucket)
         os.makedirs(self.dst_config.base_dir, exist_ok=True)
 
-    def _fetch(self, src_blob, dest_fqfn: str) -> [str]:
+    def _fetch(self, src_blob, dest_fqfn: str) -> List[str]:
         blob = self.bucket.blob(src_blob)
 
         dest_file = dest_fqfn
@@ -42,20 +43,20 @@ class Fetcher(object):
 
         return [dest_file]
 
-    def fetchVocab(self) -> [str]:
+    def fetchVocab(self) -> List[str]:
         return self._fetch(self.src_config.vocab.fqfn,
                            self.dst_config.vocab.fqfn)
 
-    def fetchModel(self) -> [str]:
+    def fetchModel(self) -> List[str]:
         return self._fetch(self.src_config.saved_model.fqfn,
                            self.dst_config.saved_model.fqfn)
 
-    def fetchVariables(self) -> [str]:
+    def fetchVariables(self) -> List[str]:
         var_blob_dir = self.src_config.variables.directory + "/"
         blobs = list(self.bucket.list_blobs(
             prefix=var_blob_dir, delimiter="/"))
 
-        new_files = []
+        new_files: List[str] = []
         for b in blobs:
             blob = self.bucket.blob(b.name)
 
@@ -73,7 +74,7 @@ class Fetcher(object):
 
         return new_files
 
-    def fetchAll(self) -> [str]:
+    def fetchAll(self) -> List[str]:
         return (
             ["=====Model====="]
             + self.fetchModel()

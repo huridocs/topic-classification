@@ -3,3 +3,4 @@
 bert_models/*
 classifier_models/*
 .credz
+.mypy_cache
