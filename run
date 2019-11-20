@@ -1,33 +1,33 @@
 #!/bin/bash
 
 P3=
-if [ -f `which python3` ]; then
-  P3=3
+if [ -f $(which python3) ]; then
+    P3=3
 fi
 
 if [ $1 = "install" ]; then
-  python${P3} -m venv venv
-  . ./venv/bin/activate
-  pip install --upgrade pip || echo "Please first sudo apt install python${P3}-pip"
-  pip install --upgrade setuptools
-  pip install --upgrade -r requirements.txt
-  exit 0
+    python${P3} -m venv venv
+    . ./venv/bin/activate
+    pip install --upgrade pip || echo "Please first sudo apt install python${P3}-pip"
+    pip install --upgrade setuptools
+    pip install --upgrade -r requirements.txt
+    exit 0
 fi
 
 if [ ! -f "venv/bin/activate" ]; then
-  ./run install
+    ./run install
 fi
 
 . ./venv/bin/activate || exit -1
 
 if [ $1 = "server" ]; then
-  flask run --host=0.0.0.0 --port=5000
+    flask run --host=0.0.0.0 --port=5000
 elif [ $1 = "local" ]; then
-  python local.py "$@"
+    python local.py "$@"
 elif [ $1 = "test" ]; then
-  mypy *.py app/*.py tests/*.py && pycodestyle && flake8 && python -m pytest -v -q
+    mypy *.py app/*.py tests/*.py && flake8 && python -m pytest -v -q
 elif [ $1 = "lint" ]; then
-  mypy *.py app/*.py tests/*.py && pycodestyle && flake8
+    mypy *.py app/*.py tests/*.py && flake8
 else
-  "$@"
+    "$@"
 fi

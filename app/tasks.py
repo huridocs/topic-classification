@@ -3,12 +3,14 @@ from typing import Any, Dict, Optional, Type
 
 
 class StatusHolder:
+
     def __init__(self) -> None:
         self.status = ''
         self.is_done = threading.Event()
 
 
 class TaskProvider:
+
     def __init__(self, json: Any) -> None:
         pass
 
@@ -17,6 +19,7 @@ class TaskProvider:
 
 
 class _Task(StatusHolder):
+
     def __init__(self, name: str, provider: TaskProvider):
         super().__init__()
         self.name = name
@@ -79,6 +82,7 @@ def GetProvider(name: str) -> Optional[Type[TaskProvider]]:
 
 
 class _WaitTask(TaskProvider):
+
     def __init__(self, json: Any):
         self.waitTime = json['time'] or 10.0
 

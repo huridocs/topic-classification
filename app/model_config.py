@@ -39,6 +39,7 @@ class ModelConfig(object):
 
 
 class InstanceConfig(ModelConfig):
+
     @property
     def bert(self) -> str:
         return cast(str, self.get_property('bert'))
@@ -58,8 +59,11 @@ class InstanceConfig(ModelConfig):
 
 class PathConfig(ModelConfig):
 
-    def __init__(self, conf_dict: Dict[str, Any], model: str,
-                 instance: Optional[str] = None, prefix: str = ''):
+    def __init__(self,
+                 conf_dict: Dict[str, Any],
+                 model: str,
+                 instance: Optional[str] = None,
+                 prefix: str = ''):
         ModelConfig.__init__(self, conf_dict)
         self.model = model
         self.instance = instance
@@ -67,10 +71,8 @@ class PathConfig(ModelConfig):
 
     @property
     def directory(self) -> str:
-        folder = os.path.join(
-            self.prefix,
-            self.get_property('path')).format(
-                model=self.model, instance=self.instance)
+        folder = os.path.join(self.prefix, self.get_property('path')).format(model=self.model,
+                                                                             instance=self.instance)
         return folder
 
     @property
@@ -79,10 +81,8 @@ class PathConfig(ModelConfig):
 
     @property
     def fqfn(self) -> str:
-        return os.path.join(
-            self.directory,
-            self.filename).format(
-                model=self.model, instance=self.instance)
+        return os.path.join(self.directory, self.filename).format(model=self.model,
+                                                                  instance=self.instance)
 
 
 # TODO: Deduplicate In and Out config classes.
@@ -110,15 +110,11 @@ class InConfig(ModelConfig):
 
     @property
     def saved_model(self) -> PathConfig:
-        return PathConfig(
-            self.get_property('saved_model'),
-            self.model_name, self.instance_name)
+        return PathConfig(self.get_property('saved_model'), self.model_name, self.instance_name)
 
     @property
     def variables(self) -> PathConfig:
-        return PathConfig(
-            self.get_property('variables'),
-            self.model_name, self.instance_name)
+        return PathConfig(self.get_property('variables'), self.model_name, self.instance_name)
 
     @property
     def vocab(self) -> PathConfig:
@@ -142,24 +138,21 @@ class OutConfig(ModelConfig):
 
     @property
     def saved_model(self) -> PathConfig:
-        return PathConfig(
-            self.get_property('saved_model'),
-            self.get_property('model_name'),
-            instance=self.get_property('instance_name'),
-            prefix=self.base_dir)
+        return PathConfig(self.get_property('saved_model'),
+                          self.get_property('model_name'),
+                          instance=self.get_property('instance_name'),
+                          prefix=self.base_dir)
 
     @property
     def variables(self) -> PathConfig:
-        return PathConfig(
-            self.get_property('variables'),
-            self.model_name,
-            instance=self.instance_name,
-            prefix=self.base_dir)
+        return PathConfig(self.get_property('variables'),
+                          self.model_name,
+                          instance=self.instance_name,
+                          prefix=self.base_dir)
 
     @property
     def vocab(self) -> PathConfig:
-        return PathConfig(
-            self.get_property('vocab'),
-            self.model_name,
-            instance=self.instance_name,
-            prefix=self.base_dir)
+        return PathConfig(self.get_property('vocab'),
+                          self.model_name,
+                          instance=self.instance_name,
+                          prefix=self.base_dir)

@@ -12,4 +12,5 @@ session = ThreadLocalODMSession(bind=create_datastore(DBHOST + '/' + DATABASE_NA
 
 
 def hasher(seq: str) -> str:
+    """MongoDb won't let us index sequences > 1024b, so we index hashes instead."""
     return hashlib.md5(str.encode(seq)).hexdigest()

@@ -1,6 +1,5 @@
 import logging
 import pickle
-from datetime import datetime
 from typing import Any, Dict, List
 
 import numpy as np
@@ -8,10 +7,9 @@ import tensorflow as tf
 import tensorflow_hub as hub
 from bert import tokenization as token
 from flask import Blueprint, jsonify, request
-from ming import schema
-from ming.odm import FieldProperty, MappedClass, Mapper
 
 from app.db import hasher, session
+from app.models import Embedding
 
 # Used for making sure all sentences end up
 # padded to equivalent vector lengths.
@@ -20,27 +18,8 @@ MAX_SEQ_LENGTH = 256
 embed_bp = Blueprint('embed_bp', __name__)
 
 
-class Embedding(MappedClass):
-    """Python representation of embedding cache schema in MongoDB."""
-
-    class __mongometa__:
-        session = session
-        name = 'embedding_cache'
-        unique_indexes = [('bert', 'seqHash')]
-
-    _id = FieldProperty(schema.ObjectId)
-    bert = FieldProperty(schema.String)
-    seq = FieldProperty(schema.String)
-    seqHash = FieldProperty(schema.String)
-    embedding = FieldProperty(schema.Binary)
-    update_timestamp = FieldProperty(datetime, if_missing=datetime.utcnow)
-
-
-Mapper.compile_all()
-Mapper.ensure_all_indexes()
-
-
 class Embedder:
+
     def __init__(self, bert: str):
         self.bert = bert
         self.tf_hub = hub.Module(bert, trainable=True)
@@ -49,12 +28,8 @@ class Embedder:
         t_info = self.tf_hub(signature='tokenization_info', as_dict=True)
         with tf.compat.v1.Session() as sess:
             # vocab_file is a BERT-global, stable mapping {tokens: ids}
-            vocab_file, do_lower_case = sess.run(
-                [t_info['vocab_file'],
-                 t_info['do_lower_case']])
-            self.tokenizer = token.FullTokenizer(
-                vocab_file=vocab_file,
-                do_lower_case=do_lower_case)
+            vocab_file, do_lower_case = sess.run([t_info['vocab_file'], t_info['do_lower_case']])
+            self.tokenizer = token.FullTokenizer(vocab_file=vocab_file, do_lower_case=do_lower_case)
 
     def get_embedding(self, seqs: List[str]) -> List[np.array]:
         if len(seqs) == 0:
@@ -68,11 +43,9 @@ class Embedder:
 
         result: List[np.array] = [None] * len(seqs)
         # fetch from cache
-        self.logger.info('Looking up cache for %d seqs' % (len(seqs)))
-        for entry in Embedding.query.find(
-                dict(bert=self.bert,
-                     seqHash={'$in': list(hashed_seq_to_index.keys())}),
-                projection=('seqHash', 'embedding')):
+        for entry in Embedding.query.find(dict(bert=self.bert,
+                                               seqHash={'$in': list(hashed_seq_to_index.keys())}),
+                                          projection=('seqHash', 'embedding')):
             result[hashed_seq_to_index[entry.seqHash]] = pickle.loads(entry.embedding)
 
         undone_seqs: List[str] = []
@@ -85,15 +58,13 @@ class Embedder:
         if len(undone_seqs) == 0:
             return result
 
-        self.logger.info('Building %d embedding matrics with TensorFlow...' %
-                         (len(undone_seqs)))
+        self.logger.info('Building %d embedding matrics with TensorFlow...' % (len(undone_seqs)))
         done_seqs = self._build_embedding(undone_seqs)
 
         for seq, matrix in zip(undone_seqs, done_seqs):
             result[hashed_seq_to_index[hasher(seq)]] = matrix
             # convert npArray to list for storage in MongoDB
-            Embedding(bert=self.bert, seq=seq, seqHash=hasher(
-                seq), embedding=pickle.dumps(matrix))
+            Embedding(bert=self.bert, seq=seq, seqHash=hasher(seq), embedding=pickle.dumps(matrix))
         session.flush()
         self.logger.info('Stored %d embedding matrices in MongoDB.' % len(done_seqs))
         return result
@@ -141,15 +112,14 @@ class Embedder:
         bert_inputs = dict(input_ids=all_input_ids,
                            input_mask=all_input_masks,
                            segment_ids=all_segment_ids)
-        bert_outputs = self.tf_hub(
-            inputs=bert_inputs, signature='tokens', as_dict=True)
+        bert_outputs = self.tf_hub(inputs=bert_inputs, signature='tokens', as_dict=True)
 
         seq_output = bert_outputs['sequence_output']
 
         with tf.compat.v1.Session() as sess:
-            sess.run([
-                tf.compat.v1.global_variables_initializer(),
-                tf.compat.v1.tables_initializer()])
+            sess.run(
+                [tf.compat.v1.global_variables_initializer(),
+                 tf.compat.v1.tables_initializer()])
             all_embeddings = sess.run(seq_output)
             out: List[np.ndarray] = [None] * num_seqs
             for i, seq in enumerate(seqs):

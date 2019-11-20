@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-from datetime import datetime
 from typing import Any, Dict, List, Set
 
 import numpy as np
@@ -9,40 +8,18 @@ import tensorflow as tf
 from flask import Blueprint
 from flask import current_app as app
 from flask import jsonify, request
-from ming import schema
-from ming.odm import FieldProperty, MappedClass, Mapper
 
 from app.db import hasher, session
 from app.embedder import MAX_SEQ_LENGTH, Embedder
 from app.model_config import InstanceConfig
+from app.models import ClassificationSample
 
 classify_bp = Blueprint('classify_bp', __name__)
 
 
-class ClassificationSample(MappedClass):
-    """Python representation of a classification sample (training and/or predicted) in MongoDB."""
-
-    class __mongometa__:
-        session = session
-        name = 'classification_sample'
-        indexes = [('model',)]
-        unique_indexes = [('model', 'seqHash')]
-
-    _id = FieldProperty(schema.ObjectId)
-    model = FieldProperty(schema.String, required=True)
-    seq = FieldProperty(schema.String, required=True)
-    seqHash = FieldProperty(schema.String, required=True)
-    training_labels = FieldProperty(schema.Array(schema.Object(fields={'topic': schema.String})))
-    predicted_labels = FieldProperty(schema.Array(schema.Object(
-        fields={'topic': schema.String, 'probability': schema.Float})))
-    update_timestamp = FieldProperty(datetime, if_missing=datetime.utcnow)
-
-
-Mapper.compile_all()
-Mapper.ensure_all_indexes()
-
-
 class TopicInfo:
+    """Collect thresholding and quality information about one topic in a classifier model."""
+
     def __init__(self, topic: str):
         self.topic = topic
         self.num_samples = 0
@@ -65,10 +42,13 @@ class TopicInfo:
                 quality = precision_100 / 100.0
         return quality
 
-    def compute_threshols(self, train_probs: List[float], false_probs: List[float]) -> None:
+    def compute_thresholds(self, train_probs: List[float], false_probs: List[float]) -> None:
         all_probs = train_probs + false_probs
         all_probs.sort()
         self.num_samples = len(train_probs)
+        self.f1_quality = 0
+        self.thresholds = {}
+        self.recalls = {}
 
         # No point in learning from too few samples.
         if self.num_samples < 10:
@@ -78,28 +58,26 @@ class TopicInfo:
             true_pos = sum([1.0 for p in train_probs if p >= thres])
             false_pos = sum([1.0 for p in false_probs if p >= thres])
             precision = true_pos / (true_pos + false_pos)
+            recall = true_pos / len(train_probs)
+            f1 = 2 * precision * recall / (precision + recall) if (precision + recall) > 0 else 0
+
+            if f1 > self.f1_quality:
+                self.f1_quality = f1
+                self.suggested_threshold = thres
+
             for target in [20, 30, 40, 50, 60, 70, 80, 90]:
                 if target not in self.thresholds and precision >= target / 100.0:
                     self.thresholds[target] = thres
-                    self.recalls[target] = true_pos / len(train_probs)
-
-        if len(self.thresholds) == 0:
-            return
-
-        def f1(precision_100: int) -> float:
-            precision = precision_100 / 100.0
-            recall = self.recalls[precision_100]
-            return (2 * precision * recall / (precision + recall))
-        best_precision = max(self.thresholds.keys(), key=f1)
-        self.suggested_threshold = self.thresholds[best_precision]
-        self.f1_quality = f1(best_precision)
+                    self.recalls[target] = recall
 
     def __str__(self) -> str:
-        res = ['%s has %d train, best quality %.02f@t=%.02f' %
-               (self.topic, self.num_samples, self.f1_quality, self.suggested_threshold)]
+        res = [
+            '%s has %d train, best quality %.02f@t=%.02f' %
+            (self.topic, self.num_samples, self.f1_quality, self.suggested_threshold)
+        ]
         for thres in self.thresholds.keys():
             res.append('  t=%.02f -> %.02f@p%.01f' %
-                       (self.thresholds[thres], self.recalls[thres], thres/100.0))
+                       (self.thresholds[thres], self.recalls[thres], thres / 100.0))
         return '\n'.join(res)
 
 
@@ -112,13 +90,10 @@ class Classifier:
             model_name (str): the name of the training model (e.g. UPR_2percent_ps0).
     """
 
-    def __init__(self,
-                 base_classifier_dir: str,
-                 model_name: str):
+    def __init__(self, base_classifier_dir: str, model_name: str):
         self.logger = logging.getLogger()
         if not os.path.isdir(base_classifier_dir):
-            raise Exception(
-                'Invalid base_classifier_dir: %s' % base_classifier_dir)
+            raise Exception('Invalid base_classifier_dir: %s' % base_classifier_dir)
         self.model_name = model_name
         self.model_config_path = os.path.join(base_classifier_dir, model_name)
         self.topic_infos: Dict[str, TopicInfo] = {}
@@ -128,13 +103,11 @@ class Classifier:
 
     def _load_instance_config(self) -> None:
         if not os.path.isdir(self.model_config_path):
-            raise Exception(
-                'Invalid model path: %s' % self.model_config_path)
+            raise Exception('Invalid model path: %s' % self.model_config_path)
         instances = os.listdir(self.model_config_path)
         # pick the latest released instance
         for i in sorted(instances, reverse=True):
-            with open(os.path.join(
-                    self.model_config_path, i, 'config.json')) as f:
+            with open(os.path.join(self.model_config_path, i, 'config.json')) as f:
                 d = json.loads(f.read())
                 if d['is_released']:
                     self.instance = i
@@ -143,9 +116,8 @@ class Classifier:
                     self._init_vocab()
                     self._init_thresholds()
                     return
-        raise Exception(
-            'No valid instance of model found in %s, instances were %s' % (
-                self.model_config_path, instances))
+        raise Exception('No valid instance of model found in %s, instances were %s' %
+                        (self.model_config_path, instances))
 
     def _init_vocab(self) -> None:
         path_to_vocab = os.path.join(self.instance_dir, self.instance_config.vocab)
@@ -153,34 +125,32 @@ class Classifier:
             with open(path_to_vocab, 'r') as f:
                 self.vocab = [line.rstrip() for line in f.readlines() if line.rstrip()]
         except Exception as e:
-            raise Exception(
-                'Failure to load vocab file from %s with exception: %s' % (path_to_vocab, e))
+            raise Exception('Failure to load vocab file from %s with exception: %s' %
+                            (path_to_vocab, e))
 
     def _init_embedding(self) -> None:
         try:
             self.embedder = Embedder(self.instance_config.bert)
         except Exception:
-            self.logger.error(
-                'Failure to load embedding created using BERT model %s:' % self.instance_config.bert
-            )
+            self.logger.error('Failure to load embedding created using BERT model %s:' %
+                              self.instance_config.bert)
             raise
 
     def _init_predictor(self) -> None:
         try:
             self.predictor = tf.contrib.predictor.from_saved_model(self.instance_dir)
         except Exception:
-            self.logger.error(
-                'Failure to create predictor based on classifer at path %s' % self.instance_dir
-            )
+            self.logger.error('Failure to create predictor based on classifer at path %s' %
+                              self.instance_dir)
             raise
 
     def _init_thresholds(self) -> None:
         path_to_thresholds = os.path.join(self.instance_dir, 'thresholds.json')
         try:
             if not os.path.exists(path_to_thresholds):
-                self.logger.warn(('The model at %s does not have thresholds, ' +
-                                  'consider ./run local --mode thresholds --model %s') %
-                                 (self.instance_dir, self.model_name))
+                self.logger.warning(('The model at %s does not have thresholds, ' +
+                                     'consider ./run local --mode thresholds --model %s') %
+                                    (self.instance_dir, self.model_name))
             else:
                 with open(path_to_thresholds, 'r') as f:
                     for k, v in json.load(f).items():
@@ -191,9 +161,8 @@ class Classifier:
                 if topic not in self.topic_infos:
                     self.topic_infos[topic] = TopicInfo(topic)
         except Exception as e:
-            raise Exception(
-                'Failure to load thresholds file from %s with exception: %s' %
-                (path_to_thresholds, e))
+            raise Exception('Failure to load thresholds file from %s with exception: %s' %
+                            (path_to_thresholds, e))
 
     def classify(self, seqs: List[str], use_thresholds: bool = True) \
             -> List[Dict[str, float]]:
@@ -237,21 +206,27 @@ class Classifier:
         for i, seq in enumerate(seqs):
             # map results back to topic strings, according to classifier metadata
             # e.g. {'education': 0.8, 'rights of the child':, 0.9}
-            topic_probs: Dict[str, float] = dict(zip(self.vocab,
-                                                     [p.item() for p in probabilities[i]]))
+            topic_probs: Dict[str, float] = dict(
+                zip(self.vocab, [p.item() for p in probabilities[i]]))
             if use_thresholds:
                 # discard all topic probability tuples who are too unlikely
-                topic_probs = {t: self.topic_infos[t].get_quality(p)
-                               for t, p in topic_probs.items()
-                               if p >= self.topic_infos[t].suggested_threshold}
+                topic_probs = {
+                    t: self.topic_infos[t].get_quality(p)
+                    for t, p in topic_probs.items()
+                    if p >= self.topic_infos[t].suggested_threshold
+                }
             result[i] = topic_probs
         return result
 
     def refresh_thresholds(self, limit: int = 2000) -> None:
-        samples = list(ClassificationSample.query.find(
-                       dict(model=self.model_name,
-                            training_labels={'$exists': True, '$not': {'$size': 0}}))
-                       .sort('-seqHash').limit(limit).all())
+        samples = list(
+            ClassificationSample.query.find(
+                dict(model=self.model_name, training_labels={
+                    '$exists': True,
+                    '$not': {
+                        '$size': 0
+                    }
+                })).sort('-seqHash').limit(limit).all())
         seqs: List[str] = [s.seq for s in samples]
         sample_probs = self.classify(seqs, False)
 
@@ -266,14 +241,17 @@ class Classifier:
                     else:
                         false_probs.append(sample_prob)
             ti = TopicInfo(topic)
-            ti.compute_threshols(train_probs, false_probs)
+            ti.compute_thresholds(train_probs, false_probs)
             self.logger.info(str(ti))
             self.topic_infos[topic] = ti
 
         path_to_thresholds = os.path.join(self.instance_dir, 'thresholds.json')
         with open(path_to_thresholds, 'w') as f:
-            f.write(json.dumps({t: v.__dict__ for t, v in self.topic_infos.items()},
-                               indent=4, sort_keys=True))
+            f.write(
+                json.dumps({t: v.__dict__
+                            for t, v in self.topic_infos.items()},
+                           indent=4,
+                           sort_keys=True))
 
 
 @classify_bp.route('/classify', methods=['POST'])
@@ -308,14 +286,15 @@ def add_sample() -> Any:
         if seqHash in processed:
             continue
         processed.add(seqHash)
-        existing: ClassificationSample = ClassificationSample.query.get(
-            model=args['model'], seqHash=seqHash)
+        existing: ClassificationSample = ClassificationSample.query.get(model=args['model'],
+                                                                        seqHash=seqHash)
         if existing:
             existing.training_labels = sample['training_labels']
         else:
-            ClassificationSample(
-                model=args['model'], seq=sample['seq'], seqHash=seqHash,
-                training_labels=sample['training_labels'])
+            ClassificationSample(model=args['model'],
+                                 seq=sample['seq'],
+                                 seqHash=seqHash,
+                                 training_labels=sample['training_labels'])
     session.flush()
     return jsonify({})
 

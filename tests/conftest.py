@@ -26,5 +26,4 @@ def pytest_runtest_setup(item: Any) -> None:
     if 'incremental' in item.keywords:
         previousfailed = getattr(item.parent, '_previousfailed', None)
         if previousfailed is not None:
-            pytest.xfail(
-                'previous test failed ({})'.format(previousfailed.name))
+            pytest.xfail('previous test failed ({})'.format(previousfailed.name))

@@ -9,21 +9,21 @@ from app import classifier, embedder, model_fetcher
 
 FLAGS = flags.FLAGS
 
-flags.DEFINE_string(
-    'bert', 'https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1', 'The bert model to use')
-flags.DEFINE_string(
-    'classifier_dir', './classifier_models', 'The dir containing classifier models.')
-flags.DEFINE_string('model', 'UPR_2percent_ps0',
-                    'The model trained for a particular label set.')
+flags.DEFINE_string('bert', 'https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1',
+                    'The bert model to use')
+flags.DEFINE_string('classifier_dir', './classifier_models',
+                    'The dir containing classifier models.')
+flags.DEFINE_string('model', 'UPR_2percent_ps0', 'The model trained for a particular label set.')
 flags.DEFINE_string('seq', 'increase efforts to end forced disappearance',
                     'The string sequence to process')
-flags.DEFINE_string('fetch_config_path', './static/model_fetching_config.json',
-                    'Path to the JSON config file describe where to fetch '
-                    'saved models from and where to copy them to.')
+flags.DEFINE_string(
+    'fetch_config_path', './static/model_fetching_config.json',
+    'Path to the JSON config file describe where to fetch '
+    'saved models from and where to copy them to.')
 flags.DEFINE_integer('limit', 2000, 'Max number of classification samples to use')
 
-flags.DEFINE_enum('mode', 'embed', ['embed', 'classify',
-                                    'prefetch', 'thresholds'], 'The operation to perform.')
+flags.DEFINE_enum('mode', 'embed', ['embed', 'classify', 'prefetch', 'thresholds'],
+                  'The operation to perform.')
 
 
 def main(_: Any) -> None:
