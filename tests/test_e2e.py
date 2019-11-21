@@ -21,17 +21,17 @@ def wait_for_task(client: FlaskClient, name: str) -> None:
 
 
 def test_e2e(app: Flask, fs: FakeFilesystem) -> None:
+    seq_pattern = (
+        'react more swiftly to comply with international instruments %d')
     instance_path = './testdata/test_model/test_instance'
     fs.add_real_directory(instance_path)
     fs.remove_object('./testdata/test_model/test_instance/thresholds.json')
     client = app.test_client()
     with app.test_request_context():
         # initial classify returns no topics because we deleted thresholds.json.
-        resp = client.post(
-            '/classify?model=test_model',
-            data=json.dumps(
-                {'seqs': ['react to comply with international instruments 1']}),
-            content_type='application/json')
+        resp = client.post('/classify?model=test_model',
+                           data=json.dumps({'seqs': [seq_pattern % 1]}),
+                           content_type='application/json')
         assert resp.status == '200 OK'
         assert len(json.loads(resp.data)[0]) == 0
 
@@ -40,8 +40,7 @@ def test_e2e(app: Flask, fs: FakeFilesystem) -> None:
             '/classification_sample?model=test_model',
             data=json.dumps({
                 'samples': [{
-                    'seq':
-                        'react to comply with international instruments %d' % i,
+                    'seq': seq_pattern % i,
                     'training_labels': [{
                         'topic': 'International instruments'
                     }]
@@ -63,14 +62,9 @@ def test_e2e(app: Flask, fs: FakeFilesystem) -> None:
         wait_for_task(client, 'thres')
 
         for i in range(20):
-            resp = client.post(
-                '/classify?model=test_model',
-                data=json.dumps({
-                    'seqs': [
-                        'react to comply with international instruments %d' % i
-                    ]
-                }),
-                content_type='application/json')
+            resp = client.post('/classify?model=test_model',
+                               data=json.dumps({'seqs': [seq_pattern % i]}),
+                               content_type='application/json')
             assert resp.status == '200 OK'
             assert len(json.loads(resp.data)[0]) == 1
 

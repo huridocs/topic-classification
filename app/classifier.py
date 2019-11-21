@@ -231,7 +231,7 @@ class Classifier:
                 # p.item() is used to convert from numpy float to python float.
                 for t, p in zip(self.vocab,
                                 [p.item() for p in probabilities[i]])
-                if p >= 0.001
+                if p > 0
             }
         return topic_probs
 
@@ -390,13 +390,15 @@ tasks.providers['RefreshPredictions'] = _RefreshPredictionsTask
 
 @classify_bp.route('/classify', methods=['POST'])
 def classify() -> Any:
-    # request.args: &model=upr-info_issues
-    # request.get_json: {'seq'="hello world'}
+    # request.args: &model=upr-info_issues[&probs]
+    # request.get_json: {'seq'='hello world', 'probs': True/False}
     data = request.get_json()
     args = request.args
 
     c = ClassifierCache.get(app.config['BASE_CLASSIFIER_DIR'], args['model'])
     with c.lock:
+        # Allow 'probs' to be set in args or data as an option to return
+        # raw probabilities.
         if 'probs' in args or ('probs' in data and data['probs']):
             results = c._classify_probs(data['seqs'])
         else:
