@@ -186,7 +186,7 @@ class Classifier:
 
         embeddings = self.embedder.get_embedding(seqs)
         embedding_shape = embeddings[0].shape
-        all_embeddings = 0.5 * np.ones([len(embeddings), MAX_SEQ_LENGTH, embedding_shape[1]])
+        all_embeddings = np.zeros([len(embeddings), MAX_SEQ_LENGTH, embedding_shape[1]])
         all_input_mask = np.zeros([len(embeddings), MAX_SEQ_LENGTH])
 
         for i, matrix in enumerate(embeddings):
@@ -198,14 +198,14 @@ class Classifier:
         # TODO(bdittes): Use prediction['attention']
         self.logger.debug(probabilities)
         topic_probs: List[Dict[str, float]] = [{}] * len(seqs)
-        for i, seq in enumerate(seqs):
+        for i in range(len(seqs)):
             # map results back to topic strings, according to classifier metadata
             # e.g. {'education': 0.8, 'rights of the child': 0.9}
             topic_probs[i] = {
                 t: p
                 # p.item() is used to convert from numpy float to python float.
                 for t, p in zip(self.vocab, [p.item() for p in probabilities[i]])
-                if p >= 0.01
+                if p >= 0.001
             }
         return topic_probs
 
@@ -245,11 +245,10 @@ class Classifier:
             false_probs = []
             for i, sample_trains in enumerate(train_labels):
                 sample_prob = sample_probs[i].get(topic, 0.0)
-                if sample_prob > 0.01:
-                    if topic in sample_trains:
-                        train_probs.append(sample_prob)
-                    else:
-                        false_probs.append(sample_prob)
+                if topic in sample_trains:
+                    train_probs.append(sample_prob)
+                else:
+                    false_probs.append(sample_prob)
             ti = TopicInfo(topic)
             ti.compute_thresholds(train_probs, false_probs)
             self.logger.info(str(ti))
@@ -364,7 +363,10 @@ def classify() -> Any:
 
     c = ClassifierCache.get(app.config['BASE_CLASSIFIER_DIR'], args['model'])
     with c.lock:
-        results = c.classify(data['seqs'])
+        if 'probs' in args or ('probs' in data and data['probs']):
+            results = c._classify_probs(data['seqs'])
+        else:
+            results = c.classify(data['seqs'])
     return jsonify(results)
 
 

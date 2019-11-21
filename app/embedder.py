@@ -81,7 +81,7 @@ class Embedder:
         if len(undone_seqs) == 0:
             return result
 
-        self.logger.info('Building %d embedding matrics with TensorFlow...' % (len(undone_seqs)))
+        self.logger.info('Building %d embedding matrices with TensorFlow...' % (len(undone_seqs)))
         done_seqs = self._build_embedding(undone_seqs)
 
         with sessionLock:
@@ -147,7 +147,7 @@ class Embedder:
         }
         all_embeddings = self.session.run(self.bert_out, bert_inputs)
         out: List[np.ndarray] = [None] * num_seqs
-        for i, seq in enumerate(seqs):
+        for i in range(len(seqs)):
             out[i] = all_embeddings[i][:int(sum(all_input_masks[i]))]
         return out
 

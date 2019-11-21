@@ -26,7 +26,7 @@ class TestClassifer:
         # result ~ [{topic: probability, topic2: probability, ...}, ...]
         for topic, _ in result[0].items():
             assert topic in c.vocab
-        assert result[0]['Right to education'] >= 0.8
+        assert result[0]['Right to education'] >= 0.7
 
     def test_missing_base_classify_dir(self) -> None:
         fake_classifier_path = './fake_testdata'
