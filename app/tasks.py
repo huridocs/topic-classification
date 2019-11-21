@@ -45,8 +45,11 @@ class _Task(StatusHolder):
 
     def _Run(self) -> None:
         self.status = 'Started'
-        self.result = self.provider.Run(self)
-        self.status = 'Done (' + self.status + ')'
+        try:
+            self.result = self.provider.Run(self)
+            self.status = 'Done (' + self.status + ')'
+        except Exception as err:
+            self.status = 'Failed (' + repr(err) + ')'
         self.is_done.set()
 
 
@@ -68,7 +71,7 @@ def GetTask(name: str) -> Optional[_Task]:
 def GetOrCreateTask(name: str, provider: TaskProvider) -> _Task:
     with taskLock:
         existing_task = tasks.get(name)
-        if existing_task and existing_task.is_done.is_set():
+        if existing_task and not existing_task.is_done.is_set():
             return existing_task
         t = _Task(name, provider)
         tasks[name] = t

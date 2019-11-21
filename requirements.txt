@@ -16,7 +16,7 @@ pycodestyle
 flake8
 flake8-quotes
 flake8-isort
-autopep8
+yapf
 ipython
 pyfakefs
 pytest

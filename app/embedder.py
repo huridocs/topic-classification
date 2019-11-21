@@ -8,8 +8,7 @@ import tensorflow_hub as hub
 from bert import tokenization as token
 from flask import Blueprint, jsonify, request
 
-from app.db import hasher, session
-from app.models import Embedding
+from app.models import Embedding, hasher, session, sessionLock
 
 # Used for making sure all sentences end up
 # padded to equivalent vector lengths.
@@ -22,14 +21,37 @@ class Embedder:
 
     def __init__(self, bert: str):
         self.bert = bert
-        self.tf_hub = hub.Module(bert, trainable=True)
         self.logger = logging.getLogger('app.logger')
+        self.session: Any = None
 
-        t_info = self.tf_hub(signature='tokenization_info', as_dict=True)
-        with tf.compat.v1.Session() as sess:
-            # vocab_file is a BERT-global, stable mapping {tokens: ids}
-            vocab_file, do_lower_case = sess.run([t_info['vocab_file'], t_info['do_lower_case']])
-            self.tokenizer = token.FullTokenizer(vocab_file=vocab_file, do_lower_case=do_lower_case)
+    def _init_session(self) -> None:
+        """Lazy init of TF session in case first request(s) can be served from cache."""
+        if self.session:
+            return
+        g = tf.Graph()
+        with g.as_default():
+            tf_hub = hub.Module(self.bert, trainable=True)
+            t_info = tf_hub(signature='tokenization_info', as_dict=True)
+
+            self.bert_in_ids = tf.compat.v1.placeholder(dtype=tf.int32, shape=None)
+            self.bert_in_mask = tf.compat.v1.placeholder(dtype=tf.int32, shape=None)
+            self.bert_in_segment = tf.compat.v1.placeholder(dtype=tf.int32, shape=None)
+            self.bert_out = tf_hub(inputs=dict(input_ids=self.bert_in_ids,
+                                               input_mask=self.bert_in_mask,
+                                               segment_ids=self.bert_in_segment),
+                                   signature='tokens',
+                                   as_dict=True)['sequence_output']
+
+            init_op = tf.group(
+                [tf.compat.v1.global_variables_initializer(),
+                 tf.compat.v1.tables_initializer()])
+        g.finalize()
+
+        self.session = tf.compat.v1.Session(graph=g)
+        self.session.run(init_op)
+        vocab_file, do_lower_case = self.session.run(
+            [t_info['vocab_file'], t_info['do_lower_case']])
+        self.tokenizer = token.FullTokenizer(vocab_file=vocab_file, do_lower_case=do_lower_case)
 
     def get_embedding(self, seqs: List[str]) -> List[np.array]:
         if len(seqs) == 0:
@@ -43,10 +65,11 @@ class Embedder:
 
         result: List[np.array] = [None] * len(seqs)
         # fetch from cache
-        for entry in Embedding.query.find(dict(bert=self.bert,
-                                               seqHash={'$in': list(hashed_seq_to_index.keys())}),
-                                          projection=('seqHash', 'embedding')):
-            result[hashed_seq_to_index[entry.seqHash]] = pickle.loads(entry.embedding)
+        with sessionLock:
+            for entry in Embedding.query.find(dict(
+                    bert=self.bert, seqHash={'$in': list(hashed_seq_to_index.keys())}),
+                                              projection=('seqHash', 'embedding')):
+                result[hashed_seq_to_index[entry.seqHash]] = pickle.loads(entry.embedding)
 
         undone_seqs: List[str] = []
         for seq in seqs:
@@ -61,15 +84,23 @@ class Embedder:
         self.logger.info('Building %d embedding matrics with TensorFlow...' % (len(undone_seqs)))
         done_seqs = self._build_embedding(undone_seqs)
 
-        for seq, matrix in zip(undone_seqs, done_seqs):
-            result[hashed_seq_to_index[hasher(seq)]] = matrix
-            # convert npArray to list for storage in MongoDB
-            Embedding(bert=self.bert, seq=seq, seqHash=hasher(seq), embedding=pickle.dumps(matrix))
-        session.flush()
+        with sessionLock:
+            for seq, matrix in zip(undone_seqs, done_seqs):
+                result[hashed_seq_to_index[hasher(seq)]] = matrix
+                # convert npArray to list for storage in MongoDB
+                Embedding(bert=self.bert,
+                          seq=seq,
+                          seqHash=hasher(seq),
+                          embedding=pickle.dumps(matrix))
+            session.flush()
         self.logger.info('Stored %d embedding matrices in MongoDB.' % len(done_seqs))
         return result
 
     def _build_embedding(self, seqs: List[str]) -> List[np.array]:
+        if len(seqs) == 0:
+            return []
+        self._init_session()
+
         num_seqs = len(seqs)
         all_input_ids = np.zeros([num_seqs, MAX_SEQ_LENGTH])
         all_input_masks = np.zeros([num_seqs, MAX_SEQ_LENGTH])
@@ -84,7 +115,7 @@ class Embedder:
             tokens = ['[CLS]'] + tokens + ['[SEP]']
 
             # segment_ids refers again to multi-sentence pre-training
-            # TODO: maybe scrap
+            # TODO(sam): maybe scrap
             segment_ids = [0] * len(tokens)
 
             # per word, get IDs from vocab file
@@ -109,22 +140,16 @@ class Embedder:
             all_input_masks[i] = input_mask
             all_segment_ids[i] = segment_ids
 
-        bert_inputs = dict(input_ids=all_input_ids,
-                           input_mask=all_input_masks,
-                           segment_ids=all_segment_ids)
-        bert_outputs = self.tf_hub(inputs=bert_inputs, signature='tokens', as_dict=True)
-
-        seq_output = bert_outputs['sequence_output']
-
-        with tf.compat.v1.Session() as sess:
-            sess.run(
-                [tf.compat.v1.global_variables_initializer(),
-                 tf.compat.v1.tables_initializer()])
-            all_embeddings = sess.run(seq_output)
-            out: List[np.ndarray] = [None] * num_seqs
-            for i, seq in enumerate(seqs):
-                out[i] = all_embeddings[i][:int(sum(all_input_masks[i]))]
-            return out
+        bert_inputs = {
+            self.bert_in_ids: all_input_ids,
+            self.bert_in_mask: all_input_masks,
+            self.bert_in_segment: all_segment_ids
+        }
+        all_embeddings = self.session.run(self.bert_out, bert_inputs)
+        out: List[np.ndarray] = [None] * num_seqs
+        for i, seq in enumerate(seqs):
+            out[i] = all_embeddings[i][:int(sum(all_input_masks[i]))]
+        return out
 
 
 @embed_bp.route('/embed', methods=['POST'])
@@ -137,5 +162,5 @@ def embed() -> Any:
 
     e = Embedder(data['bert'])
     ms = e.get_embedding(data['seqs'])
-    result = [str(len(m)) for m in ms]
+    result = [len(m.tostring()) for m in ms]
     return jsonify(result)

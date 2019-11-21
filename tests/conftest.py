@@ -4,8 +4,17 @@ import pytest
 from flask import Flask
 
 from app import create_app
+from app.classifier import ClassifierCache
+from app.models import DATABASE_NAME, datastore
 
 pytest_plugins = ('pyfakefs',)
+
+
+@pytest.fixture(scope='function', autouse=True)
+def clear_all() -> None:
+    """Make sure test data does not bleed over to other tests."""
+    datastore.db.client.drop_database(DATABASE_NAME)
+    ClassifierCache.clear_all()
 
 
 @pytest.fixture

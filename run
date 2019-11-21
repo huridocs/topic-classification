@@ -5,7 +5,10 @@ if [ -f $(which python3) ]; then
     P3=3
 fi
 
-if [ $1 = "install" ]; then
+CMD=$1
+shift
+
+if [ $CMD = "install" ]; then
     python${P3} -m venv venv
     . ./venv/bin/activate
     pip install --upgrade pip || echo "Please first sudo apt install python${P3}-pip"
@@ -20,14 +23,18 @@ fi
 
 . ./venv/bin/activate || exit -1
 
-if [ $1 = "server" ]; then
-    flask run --host=0.0.0.0 --port=5000
-elif [ $1 = "local" ]; then
+if [ $CMD = "server" ]; then
+    flask run --host=0.0.0.0 --port=5000 "$@"
+elif [ $CMD = "local" ]; then
     python local.py "$@"
-elif [ $1 = "test" ]; then
-    mypy *.py app/*.py tests/*.py && flake8 && python -m pytest -v -q
-elif [ $1 = "lint" ]; then
-    mypy *.py app/*.py tests/*.py && flake8
+elif [ $CMD = "lint" ]; then
+    mypy *.py app/*.py tests/*.py &&
+        flake8 &&
+        (yapf -d *.py tests/*.py app/*.py >/dev/null || (echo 'Format not happy, do ./run format!' && exit -1))
+elif [ $CMD = "format" ]; then
+    yapf -i *.py tests/*.py app/*.py "$@"
+elif [ $CMD = "test" ]; then
+    ./run lint && python -m pytest -v -q "$@"
 else
-    "$@"
+    "$CMD" "$@"
 fi

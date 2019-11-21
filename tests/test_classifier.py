@@ -23,9 +23,10 @@ class TestClassifer:
         assert c.instance == 'test_instance'
         print(result)
         assert result
-        # result ~ {'seq': [(topic, probability), (topic2, probability)...], ...}
+        # result ~ [{topic: probability, topic2: probability, ...}, ...]
         for topic, _ in result[0].items():
-            assert topic[0] in c.vocab
+            assert topic in c.vocab
+        assert result[0]['Right to education'] >= 0.8
 
     def test_missing_base_classify_dir(self) -> None:
         fake_classifier_path = './fake_testdata'
@@ -70,7 +71,9 @@ class TestClassifer:
         fs.create_file('./testdata/test_model/test_instance/config.json', contents=config)
         with pytest.raises(Exception,
                            match=r"unsupported handle format '{0}'".format(bad_bert_path)):
-            Classifier(self.BASE_CLASSIFIER_PATH, 'test_model')
+            c = Classifier(self.BASE_CLASSIFIER_PATH, 'test_model')
+            # Bad bert is only used on uncached embed.
+            c.classify(['some string'])
 
     def test_missing_model(self, fs: FakeFilesystem) -> None:
         instance_path = os.path.join(self.BASE_CLASSIFIER_PATH, 'test_model',
