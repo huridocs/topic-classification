@@ -1,24 +1,21 @@
 import logging
 import os
 
-from flask import Flask, current_app
-
-from app import embedder
-from app import classifier
+from flask import Flask
 
 
-def create_app():
+def create_app() -> Flask:
     app = Flask(__name__)
 
     # initialize configuration values
-    config_name = os.getenv("FLASK_ENV", 'default')
-    app.logger.debug("Reading " + config_name + " configuration...")
-    app.logger.debug("App config:")
+    config_name = os.getenv('FLASK_ENV', 'default')
+    app.logger.debug('Reading ' + config_name + ' configuration...')
+    app.logger.debug('App config:')
 
     # hard-code some configuration
-    app.config["BASE_CLASSIFIER_DIR"] = "./classifier_models"
+    app.config['BASE_CLASSIFIER_DIR'] = './classifier_models'
     for k, v in app.config.items():
-        app.logger.debug("%s: %s" % (k, v))
+        app.logger.debug('%s: %s' % (k, v))
 
     # configure logging
     if not app.debug:
@@ -28,7 +25,6 @@ def create_app():
         # Include our Routes
         from . import classifier
         from . import embedder
-        from . import model_fetcher
         from . import task_routes
 
         # Register Blueprints
