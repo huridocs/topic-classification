@@ -25,7 +25,7 @@ class Embedder:
         self.session: Any = None
 
     def _init_session(self) -> None:
-        """Lazy init of TF session in case first request(s) can be served from cache."""
+        """Lazy init of TF session."""
         if self.session:
             return
         g = tf.Graph()
@@ -33,31 +33,39 @@ class Embedder:
             tf_hub = hub.Module(self.bert, trainable=True)
             t_info = tf_hub(signature='tokenization_info', as_dict=True)
 
-            self.bert_in_ids = tf.compat.v1.placeholder(dtype=tf.int32, shape=None)
-            self.bert_in_mask = tf.compat.v1.placeholder(dtype=tf.int32, shape=None)
-            self.bert_in_segment = tf.compat.v1.placeholder(dtype=tf.int32, shape=None)
-            self.bert_out = tf_hub(inputs=dict(input_ids=self.bert_in_ids,
-                                               input_mask=self.bert_in_mask,
-                                               segment_ids=self.bert_in_segment),
+            self.bert_in_ids = tf.compat.v1.placeholder(dtype=tf.int32,
+                                                        shape=None)
+            self.bert_in_mask = tf.compat.v1.placeholder(dtype=tf.int32,
+                                                         shape=None)
+            self.bert_in_segment = tf.compat.v1.placeholder(dtype=tf.int32,
+                                                            shape=None)
+            self.bert_out = tf_hub(inputs=dict(
+                input_ids=self.bert_in_ids,
+                input_mask=self.bert_in_mask,
+                segment_ids=self.bert_in_segment),
                                    signature='tokens',
                                    as_dict=True)['sequence_output']
 
-            init_op = tf.group(
-                [tf.compat.v1.global_variables_initializer(),
-                 tf.compat.v1.tables_initializer()])
+            init_op = tf.group([
+                tf.compat.v1.global_variables_initializer(),
+                tf.compat.v1.tables_initializer()
+            ])
         g.finalize()
 
         self.session = tf.compat.v1.Session(graph=g)
         self.session.run(init_op)
         vocab_file, do_lower_case = self.session.run(
             [t_info['vocab_file'], t_info['do_lower_case']])
-        self.tokenizer = token.FullTokenizer(vocab_file=vocab_file, do_lower_case=do_lower_case)
+        self.tokenizer = token.FullTokenizer(vocab_file=vocab_file,
+                                             do_lower_case=do_lower_case)
 
     def get_embedding(self, seqs: List[str]) -> List[np.array]:
         if len(seqs) == 0:
             return []
         if len(seqs) > 5000:
-            raise Exception('You should never handle more than 5000 berts at the same time!')
+            raise Exception(
+                'You should never handle more than 5000 berts at the same time!'
+            )
 
         hashed_seq_to_index: Dict[str, int] = {}
         for i, seq in enumerate(seqs):
@@ -66,22 +74,26 @@ class Embedder:
         result: List[np.array] = [None] * len(seqs)
         # fetch from cache
         with sessionLock:
-            for entry in Embedding.query.find(dict(
-                    bert=self.bert, seqHash={'$in': list(hashed_seq_to_index.keys())}),
-                                              projection=('seqHash', 'embedding')):
-                result[hashed_seq_to_index[entry.seqHash]] = pickle.loads(entry.embedding)
+            for entry in Embedding.query.find(
+                    dict(bert=self.bert,
+                         seqHash={'$in': list(hashed_seq_to_index.keys())}),
+                    projection=('seqHash', 'embedding')):
+                result[hashed_seq_to_index[entry.seqHash]] = pickle.loads(
+                    entry.embedding)
 
         undone_seqs: List[str] = []
         for seq in seqs:
             if result[hashed_seq_to_index[hasher(seq)]] is None:
                 undone_seqs.append(seq)
 
-        self.logger.info('Using %d of %d embedding matrices fetched from MongoDB.' %
-                         (len(seqs) - len(undone_seqs), len(seqs)))
+        self.logger.info(
+            'Using %d of %d embedding matrices fetched from MongoDB.' %
+            (len(seqs) - len(undone_seqs), len(seqs)))
         if len(undone_seqs) == 0:
             return result
 
-        self.logger.info('Building %d embedding matrices with TensorFlow...' % (len(undone_seqs)))
+        self.logger.info('Building %d embedding matrices with TensorFlow...' %
+                         (len(undone_seqs)))
         done_seqs = self._build_embedding(undone_seqs)
 
         with sessionLock:
@@ -93,7 +105,8 @@ class Embedder:
                           seqHash=hasher(seq),
                           embedding=pickle.dumps(matrix))
             session.flush()
-        self.logger.info('Stored %d embedding matrices in MongoDB.' % len(done_seqs))
+        self.logger.info('Stored %d embedding matrices in MongoDB.' %
+                         len(done_seqs))
         return result
 
     def _build_embedding(self, seqs: List[str]) -> List[np.array]:

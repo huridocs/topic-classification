@@ -8,8 +8,10 @@ import bson
 from ming import create_datastore, schema
 from ming.odm import FieldProperty, MappedClass, Mapper, ODMSession
 
-DBHOST = environ['DBHOST'] if 'DBHOST' in environ else 'mongodb://localhost:27017'
-DATABASE_NAME = environ['DATABASE_NAME'] if 'DATABASE_NAME' in environ else 'classifier_dev'
+DBHOST = environ[
+    'DBHOST'] if 'DBHOST' in environ else 'mongodb://localhost:27017'
+DATABASE_NAME = environ[
+    'DATABASE_NAME'] if 'DATABASE_NAME' in environ else 'classifier_dev'
 
 datastore = create_datastore(DBHOST + '/' + DATABASE_NAME)
 session = ODMSession(bind=datastore, autoflush=False)
@@ -17,7 +19,7 @@ sessionLock = threading.Lock()
 
 
 def hasher(seq: str) -> str:
-    """MongoDb won't let us index sequences > 1024b, so we index hashes instead."""
+    """MongoDb can't index sequences > 1024b, so we index hashes instead."""
     return hashlib.md5(str.encode(seq)).hexdigest()
 
 
@@ -65,7 +67,7 @@ class Embedding(MappedClass, JsonOdmHelper):
 
 
 class ClassificationSample(MappedClass, JsonOdmHelper):
-    """Python representation of a classification sample (training and/or predicted) in MongoDB."""
+    """Python classification sample (training and/or predicted) in MongoDB."""
 
     class __mongometa__:
         session = session
@@ -77,14 +79,17 @@ class ClassificationSample(MappedClass, JsonOdmHelper):
     model = FieldProperty(schema.String)
     seq = FieldProperty(schema.String)
     seqHash = FieldProperty(schema.String)
-    training_labels = FieldProperty(schema.Array(schema.Object(fields={'topic': schema.String})))
-    # Keep separate to control which samples should be used even if more have training_labels.
+    training_labels = FieldProperty(
+        schema.Array(schema.Object(fields={'topic': schema.String})))
+    # Keep separate to control which samples should
+    # be used even if more have training_labels.
     use_for_training = FieldProperty(schema.Bool)
     predicted_labels = FieldProperty(
-        schema.Array(schema.Object(fields={
-            'topic': schema.String,
-            'quality': schema.Float
-        })))
+        schema.Array(
+            schema.Object(fields={
+                'topic': schema.String,
+                'quality': schema.Float
+            })))
     update_timestamp = FieldProperty(datetime, if_missing=datetime.utcnow)
 
 

@@ -29,10 +29,11 @@ def test_classify(app: Flask, fs: FakeFilesystem) -> None:
     client = app.test_client()
 
     with app.test_request_context():
-        resp = client.post('/classify?model=test_model',
-                           data=json.dumps(
-                               {'seqs': ['take forceful action to improve childrens rights']}),
-                           content_type='application/json')
+        resp = client.post(
+            '/classify?model=test_model',
+            data=json.dumps(
+                {'seqs': ['take forceful action to improve childrens rights']}),
+            content_type='application/json')
     assert resp.status == '200 OK'
     result = json.loads(resp.data)
     assert result

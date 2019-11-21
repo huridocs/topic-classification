@@ -9,7 +9,9 @@ from pyfakefs.fake_filesystem import FakeFilesystem
 def wait_for_task(client: FlaskClient, name: str) -> None:
     while True:
         time.sleep(0.1)
-        resp = client.get('/task', data=json.dumps({'name': name}), content_type='application/json')
+        resp = client.get('/task',
+                          data=json.dumps({'name': name}),
+                          content_type='application/json')
         assert resp.status == '200 OK'
         status = json.loads(resp.data)['status']
         print(status)
@@ -28,7 +30,7 @@ def test_e2e(app: Flask, fs: FakeFilesystem) -> None:
         resp = client.post(
             '/classify?model=test_model',
             data=json.dumps(
-                {'seqs': ['react more swiftly to comply with international instruments 1']}),
+                {'seqs': ['react to comply with international instruments 1']}),
             content_type='application/json')
         assert resp.status == '200 OK'
         assert len(json.loads(resp.data)[0]) == 0
@@ -38,7 +40,8 @@ def test_e2e(app: Flask, fs: FakeFilesystem) -> None:
             '/classification_sample?model=test_model',
             data=json.dumps({
                 'samples': [{
-                    'seq': 'react more swiftly to comply with international instruments %d' % i,
+                    'seq':
+                        'react to comply with international instruments %d' % i,
                     'training_labels': [{
                         'topic': 'International instruments'
                     }]
@@ -63,7 +66,9 @@ def test_e2e(app: Flask, fs: FakeFilesystem) -> None:
             resp = client.post(
                 '/classify?model=test_model',
                 data=json.dumps({
-                    'seqs': ['react more swiftly to comply with international instruments %d' % i]
+                    'seqs': [
+                        'react to comply with international instruments %d' % i
+                    ]
                 }),
                 content_type='application/json')
             assert resp.status == '200 OK'
@@ -82,5 +87,6 @@ def test_e2e(app: Flask, fs: FakeFilesystem) -> None:
         assert resp.status == '200 OK'
         data = json.loads(resp.data)
         assert len(data) == 20
-        assert data[0]['predicted_labels'][0]['topic'] == 'International instruments'
+        assert data[0]['predicted_labels'][0][
+            'topic'] == 'International instruments'
         assert data[0]['predicted_labels'][0]['quality'] >= 0.5

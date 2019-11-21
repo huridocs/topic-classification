@@ -71,8 +71,8 @@ class PathConfig(ModelConfig):
 
     @property
     def directory(self) -> str:
-        folder = os.path.join(self.prefix, self.get_property('path')).format(model=self.model,
-                                                                             instance=self.instance)
+        folder = os.path.join(self.prefix, self.get_property('path')).format(
+            model=self.model, instance=self.instance)
         return folder
 
     @property
@@ -81,8 +81,9 @@ class PathConfig(ModelConfig):
 
     @property
     def fqfn(self) -> str:
-        return os.path.join(self.directory, self.filename).format(model=self.model,
-                                                                  instance=self.instance)
+        return os.path.join(self.directory,
+                            self.filename).format(model=self.model,
+                                                  instance=self.instance)
 
 
 # TODO: Deduplicate In and Out config classes.
@@ -110,11 +111,13 @@ class InConfig(ModelConfig):
 
     @property
     def saved_model(self) -> PathConfig:
-        return PathConfig(self.get_property('saved_model'), self.model_name, self.instance_name)
+        return PathConfig(self.get_property('saved_model'), self.model_name,
+                          self.instance_name)
 
     @property
     def variables(self) -> PathConfig:
-        return PathConfig(self.get_property('variables'), self.model_name, self.instance_name)
+        return PathConfig(self.get_property('variables'), self.model_name,
+                          self.instance_name)
 
     @property
     def vocab(self) -> PathConfig:
