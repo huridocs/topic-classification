@@ -15,16 +15,24 @@ class Fetcher(object):
 
     def __init__(self,
                  config_path=None,
-                 src_config=None, dest_config=None):
+                 src_config=None, dest_config=None,
+                 require_instance_config=True):
         self.logger = logging.getLogger()
+        self.require_instance_config = require_instance_config
         if src_config and dest_config:
             self.src_config = src_config
             self.dst_config = dest_config
         else:
             with open(config_path) as f:
                 data = json.loads(f.read())
-                self.src_config = mc.InConfig(data["source"])
-                self.dst_config = mc.OutConfig(data["destination"])
+                self.src_config = mc.InConfig(
+                    data["source"],
+                    model_name=data["model_name"],
+                    instance_name=data["instance_name"])
+                self.dst_config = mc.OutConfig(
+                    data["destination"],
+                    model_name=data["model_name"],
+                    instance_name=data["instance_name"])
 
         self.client = storage.Client.from_service_account_json(
             self.src_config.google_acct_key_path)
@@ -51,6 +59,19 @@ class Fetcher(object):
         return self._fetch(self.src_config.saved_model.fqfn,
                            self.dst_config.saved_model.fqfn)
 
+    def fetchInstanceConfig(self) -> List[str]:
+        result = ['']
+        try:
+            result = self._fetch(self.src_config.instance_config.fqfn,
+                                 self.dst_config.instance_config.fqfn)
+        except Exception as e:
+            if self.require_instance_config:
+                raise Exception(
+                        "Expected an instance config JSON file %s in "
+                        "the source directory, and it was not found." % (
+                                self.src_config.instance_config.fqfn))
+        return result
+
     def fetchVariables(self) -> List[str]:
         var_blob_dir = self.src_config.variables.directory + "/"
         blobs = list(self.bucket.list_blobs(
@@ -76,7 +97,9 @@ class Fetcher(object):
 
     def fetchAll(self) -> List[str]:
         return (
-            ["=====Model====="]
+            ["=====Config====="]
+            + self.fetchInstanceConfig()
+            + ["=====Model====="]
             + self.fetchModel()
             + ["=====Label====="]
             + self.fetchVocab()

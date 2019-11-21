@@ -28,8 +28,10 @@ class ModelConfig(object):
     """ A ModelConfig is a configuration object whose attributes """
     """ correspond to keys in the supplied dictory."""
 
-    def __init__(self, conf_dict):
+    def __init__(self, conf_dict, model_name=None, instance_name=None):
         self._config = conf_dict
+        self.model_name = model_name
+        self.instance_name = instance_name
 
     def get_property(self, property_name: str):
         if property_name not in self._config.keys():
@@ -95,22 +97,21 @@ class InConfig(ModelConfig):
         return self.get_property("bucket_name")
 
     @property
-    def model_name(self):
-        return self.get_property("model_name")
-
-    @property
     def bert(self):
         return self.get_property("bert")
-
-    @property
-    def instance_name(self):
-        return self.get_property("instance_name")
 
     @property
     def saved_model(self):
         return PathConfig(
             self.get_property("saved_model"),
             self.model_name, self.instance_name)
+
+    @property
+    def instance_config(self):
+        return PathConfig(
+            self.get_property("instance_config"),
+            self.model_name,
+            instance=self.instance_name)
 
     @property
     def variables(self):
@@ -131,19 +132,19 @@ class OutConfig(ModelConfig):
         return self.get_property("base_dir")
 
     @property
-    def model_name(self):
-        return self.get_property("model_name")
-
-    @property
-    def instance_name(self):
-        return self.get_property("instance_name")
+    def instance_config(self):
+        return PathConfig(
+            self.get_property("instance_config"),
+            self.model_name,
+            instance=self.instance_name,
+            prefix=self.base_dir)
 
     @property
     def saved_model(self):
         return PathConfig(
             self.get_property("saved_model"),
-            self.get_property("model_name"),
-            instance=self.get_property("instance_name"),
+            self.model_name,
+            instance=self.instance_name,
             prefix=self.base_dir)
 
     @property
