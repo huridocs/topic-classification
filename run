@@ -1,8 +1,10 @@
 #!/bin/bash
 
 P3=
-if [ -f $(which python3.6) ]; then
-    P3=3.6
+if [[ -f $(which python3.7) ]]; then
+    P3=3.7
+else
+    echo "WARNING: Could not find python 3.7 in path. You probable want to 'sudo apt install python3.7-venv'."
 fi
 
 CMD=$1

@@ -1,4 +1,4 @@
-# Tested with Python 3.6
+# Tested with Python 3.7
 
 # Prod:
 Flask==1.1.1
