@@ -1,16 +1,18 @@
+# Tested with Python 3.7
+
 # Prod:
-flask
-google-cloud-storage
+Flask==1.1.1
+google-cloud-storage==1.23.0
 python-dotenv
 tensorflow==1.15.0
-tensorflow-hub
-numpy
-bert-tensorflow
-ming
+tensorflow-hub==0.7.0
+numpy==1.17.4
+bert-tensorflow==1.0.1
+ming==0.9.1
 
 # Dev:
-flask
 pip
+pipdeptree
 setuptools
 pycodestyle
 flake8
@@ -18,9 +20,13 @@ flake8-quotes
 flake8-isort
 yapf
 ipython
-pyfakefs
-pytest
+pyfakefs==3.6.1
+pytest==5.3.0
 pytest-env
 mypy
-# To install mypy in vscode, install the 'mypy' plugin and provide the 'mypyls' setting with an absolute path to your <workspace>/venv/bin/mypyls
-https://github.com/matangover/mypyls/archive/master.zip#egg=mypyls[default-mypy]
+
+# To install mypy in vscode, install the 'mypy' plugin and run these:
+# sudo apt install python3.8-venv python3.8-dev
+# python3.8 -m venv ~/.mypyls
+# ~/.mypyls/bin/pip install wheel
+# ~/.mypyls/bin/pip install "https://github.com/matangover/mypyls/archive/master.zip#egg=mypyls[patched-mypy]"

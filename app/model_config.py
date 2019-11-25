@@ -29,8 +29,13 @@ class ModelConfig(object):
     """ A ModelConfig is a configuration object whose attributes """
     """ correspond to keys in the supplied dictory."""
 
-    def __init__(self, conf_dict: Dict[str, Any]):
+    def __init__(self,
+                 conf_dict: Dict[str, Any],
+                 model_name: Optional[str] = None,
+                 instance_name: Optional[str] = None):
         self._config = conf_dict
+        self.model_name = model_name
+        self.instance_name = instance_name
 
     def get_property(self, property_name: str) -> Any:
         if property_name not in self._config.keys():
@@ -98,30 +103,28 @@ class InConfig(ModelConfig):
         return cast(str, self.get_property('bucket_name'))
 
     @property
-    def model_name(self) -> str:
-        return cast(str, self.get_property('model_name'))
-
-    @property
     def bert(self) -> str:
         return cast(str, self.get_property('bert'))
 
     @property
-    def instance_name(self) -> str:
-        return cast(str, self.get_property('instance_name'))
+    def saved_model(self) -> PathConfig:
+        return PathConfig(self.get_property('saved_model'),
+                          (self.model_name or ''), self.instance_name)
 
     @property
-    def saved_model(self) -> PathConfig:
-        return PathConfig(self.get_property('saved_model'), self.model_name,
-                          self.instance_name)
+    def instance_config(self) -> PathConfig:
+        return PathConfig(self.get_property('instance_config'),
+                          (self.model_name or ''),
+                          instance=self.instance_name)
 
     @property
     def variables(self) -> PathConfig:
-        return PathConfig(self.get_property('variables'), self.model_name,
-                          self.instance_name)
+        return PathConfig(self.get_property('variables'),
+                          (self.model_name or ''), self.instance_name)
 
     @property
     def vocab(self) -> PathConfig:
-        return PathConfig(self.get_property('vocab'), self.model_name)
+        return PathConfig(self.get_property('vocab'), (self.model_name or ''))
 
 
 # TODO: Deduplicate In and Out config classes.
@@ -132,30 +135,28 @@ class OutConfig(ModelConfig):
         return cast(str, self.get_property('base_dir'))
 
     @property
-    def model_name(self) -> str:
-        return cast(str, self.get_property('model_name'))
-
-    @property
-    def instance_name(self) -> str:
-        return cast(str, self.get_property('instance_name'))
+    def instance_config(self) -> PathConfig:
+        return PathConfig(self.get_property('instance_config'),
+                          (self.model_name or ''),
+                          instance=self.instance_name,
+                          prefix=self.base_dir)
 
     @property
     def saved_model(self) -> PathConfig:
         return PathConfig(self.get_property('saved_model'),
-                          self.get_property('model_name'),
-                          instance=self.get_property('instance_name'),
+                          (self.model_name or ''),
+                          instance=self.instance_name,
                           prefix=self.base_dir)
 
     @property
     def variables(self) -> PathConfig:
         return PathConfig(self.get_property('variables'),
-                          self.model_name,
+                          (self.model_name or ''),
                           instance=self.instance_name,
                           prefix=self.base_dir)
 
     @property
     def vocab(self) -> PathConfig:
-        return PathConfig(self.get_property('vocab'),
-                          self.model_name,
+        return PathConfig(self.get_property('vocab'), (self.model_name or ''),
                           instance=self.instance_name,
                           prefix=self.base_dir)
