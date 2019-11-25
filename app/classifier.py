@@ -40,49 +40,11 @@ class TopicInfo:
         self.recalls = {int(k): v for k, v in self.recalls.items()}
 
     def get_quality(self, prob: float) -> float:
-        if len(self.thresholds) == 0:
-            return prob
         quality = 0.0
         for precision_100, threshold in self.thresholds.items():
             if prob >= threshold:
                 quality = precision_100 / 100.0
         return quality
-
-    def compute_thresholds(self, train_probs: List[float],
-                           false_probs: List[float]) -> None:
-        all_probs = train_probs + false_probs
-        all_probs.sort()
-        self.num_samples = len(train_probs)
-        self.suggested_threshold = 1.1
-        self.f1_quality_at_suggested = 0.0
-        self.precision_at_suggested = 0.0
-        self.thresholds = {}
-        self.recalls = {}
-
-        # No point in learning from too few samples.
-        if self.num_samples < 10:
-            return
-
-        for thres in all_probs:
-            true_pos = sum([1.0 for p in train_probs if p >= thres])
-            false_pos = sum([1.0 for p in false_probs if p >= thres])
-            precision = true_pos / (true_pos + false_pos)
-            recall = true_pos / len(train_probs)
-            f1 = 2 * precision * recall / (precision + recall) if (
-                precision + recall) > 0 else 0
-
-            # Only increase suggested_threshold until precision hits 50%
-            if (f1 > self.f1_quality_at_suggested and
-                    self.precision_at_suggested < 0.5):
-                self.precision_at_suggested = precision
-                self.f1_quality_at_suggested = f1
-                self.suggested_threshold = thres
-
-            for target in [20, 30, 40, 50, 60, 70, 80, 90]:
-                if (target not in self.thresholds and
-                        precision >= target / 100.0):
-                    self.thresholds[target] = thres
-                    self.recalls[target] = recall
 
     def __str__(self) -> str:
         res = [
@@ -95,6 +57,39 @@ class TopicInfo:
                 '  t=%.02f -> %.02f@p%.01f' %
                 (self.thresholds[thres], self.recalls[thres], thres / 100.0))
         return '\n'.join(res)
+
+
+def ComputeThresholds(topic: str, train_probs: List[float],
+                      false_probs: List[float]) -> TopicInfo:
+    all_probs = train_probs + false_probs
+    all_probs.sort()
+    ti = TopicInfo(topic)
+    ti.num_samples = len(train_probs)
+
+    # No point in learning from too few samples.
+    if ti.num_samples < 10:
+        return ti
+
+    for thres in all_probs:
+        true_pos = sum([1.0 for p in train_probs if p >= thres])
+        false_pos = sum([1.0 for p in false_probs if p >= thres])
+        precision = true_pos / (true_pos + false_pos)
+        recall = true_pos / len(train_probs)
+        f1 = 2 * precision * recall / (precision + recall) if (
+            precision + recall) > 0 else 0
+
+        # Only increase suggested_threshold until precision hits 50%
+        if (precision >= 0.3 and f1 > ti.f1_quality_at_suggested and
+                ti.precision_at_suggested <= 0.3):
+            ti.precision_at_suggested = precision
+            ti.f1_quality_at_suggested = f1
+            ti.suggested_threshold = thres
+
+        for target in [20, 30, 40, 50, 60, 70, 80, 90]:
+            if (target not in ti.thresholds and precision >= target / 100.0):
+                ti.thresholds[target] = thres
+                ti.recalls[target] = recall
+    return ti
 
 
 class Classifier:
@@ -146,7 +141,7 @@ class Classifier:
                                      self.instance_config.vocab)
         try:
             with open(path_to_vocab, 'r') as f:
-                self.vocab = [
+                self.vocab: List[str] = [
                     line.rstrip() for line in f.readlines() if line.rstrip()
                 ]
         except Exception as e:
@@ -258,6 +253,20 @@ class Classifier:
         """
         return self._props_to_quality(self._classify_probs(seqs))
 
+    @staticmethod
+    def _build_info(train_labels: List[Set[str]],
+                    sample_probs: List[Dict[str, float]],
+                    topic: str) -> TopicInfo:
+        train_probs = []
+        false_probs = []
+        for i, sample_trains in enumerate(train_labels):
+            sample_prob = sample_probs[i].get(topic, 0.0)
+            if topic in sample_trains:
+                train_probs.append(sample_prob)
+            else:
+                false_probs.append(sample_prob)
+        return ComputeThresholds(topic, train_probs, false_probs)
+
     def refresh_thresholds(self, limit: int = 2000) -> None:
         with sessionLock:
             samples: List[ClassificationSample] = list(
@@ -265,25 +274,41 @@ class Classifier:
                     dict(model=self.model_name,
                          use_for_training=True)).sort('-seqHash').limit(limit))
             seqs = [s.seq for s in samples]
-            train_labels = [
+            train_labels: List[Set[str]] = [
                 set([l.topic for l in s.training_labels]) for s in samples
             ]
 
         sample_probs = self._classify_probs(seqs)
 
-        for topic in self.vocab:
-            train_probs = []
-            false_probs = []
-            for i, sample_trains in enumerate(train_labels):
-                sample_prob = sample_probs[i].get(topic, 0.0)
-                if topic in sample_trains:
-                    train_probs.append(sample_prob)
-                else:
-                    false_probs.append(sample_prob)
-            ti = TopicInfo(topic)
-            ti.compute_thresholds(train_probs, false_probs)
+        # TODO(bdittes): Enable multiprocessing.
+        for ti in [
+                Classifier._build_info(train_labels, sample_probs, topic)
+                for topic in self.vocab
+        ]:
             self.logger.info(str(ti))
-            self.topic_infos[topic] = ti
+            self.topic_infos[ti.topic] = ti
+
+        sample_quality = self._props_to_quality(sample_probs)
+        error_rates = {}
+        for precision in [30, 40, 50, 60, 70, 80, 90]:
+            num_complete = 0.0
+            sum_extra = 0.0
+            for i, sample_trains in enumerate(train_labels):
+                num_found = 0
+                for train_topic in sample_trains:
+                    sample_qual = sample_quality[i].get(train_topic, 0.0)
+                    if sample_qual >= precision / 100.0:
+                        num_found += 1
+                if num_found >= len(sample_trains):
+                    num_complete += 1
+                sum_extra += len([
+                    q for q in sample_quality[i].values()
+                    if q >= precision / 100.0
+                ]) - num_found
+            error_rates[precision] = dict(
+                perc_complete=num_complete / len(train_labels),
+                avg_extra=sum_extra / len(train_labels))
+        print(error_rates)
 
         path_to_thresholds = os.path.join(self.instance_dir, 'thresholds.json')
         with open(path_to_thresholds, 'w') as f:

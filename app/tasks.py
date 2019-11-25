@@ -1,4 +1,5 @@
 import threading
+import traceback
 from typing import Any, Dict, Optional, Type
 
 
@@ -49,6 +50,7 @@ class _Task(StatusHolder):
             self.result = self.provider.Run(self)
             self.status = 'Done (' + self.status + ')'
         except Exception as err:
+            traceback.print_exc()
             self.status = 'Failed (' + repr(err) + ')'
         self.is_done.set()
 

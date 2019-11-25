@@ -1,8 +1,8 @@
 #!/bin/bash
 
 P3=
-if [ -f $(which python3) ]; then
-    P3=3
+if [ -f $(which python3.6) ]; then
+    P3=3.6
 fi
 
 CMD=$1
