@@ -1,0 +1,10 @@
+{
+  "recommendations": [
+    "ms-python.python",
+    "matangover.mypy",
+    "kevinglasson.cornflakes-linter",
+    "joeyyizhao.mongo-runner",
+    "himanoa.python-autopep8",
+    "humao.rest-client"
+  ]
+}

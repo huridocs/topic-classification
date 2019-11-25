@@ -1,5 +1,90 @@
+### Add seqs
+POST http://localhost:5000/classification_sample?model=dummy_model HTTP/1.1
+content-type: application/json
 
-### POST
+{
+    "samples": [
+        {
+            "seq": "hello world",
+            "training_labels" : [{
+                "topic": "abc"
+            }]
+        },
+        {
+            "seq": "hello world 2",
+            "training_labels" : [{
+                "topic": "abc2"
+            }]
+        },
+        {
+            "seq": "hello world 3"
+        }
+    ]
+}
+
+### Get seqs
+GET http://localhost:5000/classification_sample?model=dummy_model&seq=*&limit=3 HTTP/1.1
+
+### Del seqs
+DELETE http://localhost:5000/classification_sample?model=dummy_model&seq=hello%20world HTTP/1.1
+
+### Del all
+DELETE http://localhost:5000/classification_sample?model=dummy_model&seq=* HTTP/1.1
+
+### Classify
+POST http://localhost:5000/classify?model=upr-info-issues HTTP/1.1
+content-type: application/json
+
+{
+    "seqs": [
+        "continue to defend children's rights",
+        "implement measures against enforced disappearance"
+    ]
+}
+
+### Thresholds task
+POST http://localhost:5000/task HTTP/1.1
+content-type: application/json
+
+{
+    "provider": "RefreshThresholds",
+    "name": "refresh-upr-info-issues",
+    "model": "upr-info-issues",
+    "limit": 5000
+}
+
+### Thresholds task GET
+GET http://localhost:5000/task HTTP/1.1
+content-type: application/json
+
+{
+    "name": "refresh-upr-info-issues"
+}
+
+
+### Prediction task
+POST http://localhost:5000/task HTTP/1.1
+content-type: application/json
+
+{
+    "provider": "RefreshPredictions",
+    "name": "predict-upr-info-issues",
+    "model": "upr-info-issues",
+    "limit": 500000
+}
+
+### Prediction task GET
+GET http://localhost:5000/task HTTP/1.1
+content-type: application/json
+
+{
+    "name": "predict-upr-info-issues"
+}
+
+### Get seqs
+GET http://localhost:5000/classification_sample?model=upr-info-issues&seq=*&limit=3 HTTP/1.1
+
+### Wait task
 POST http://localhost:5000/task HTTP/1.1
 content-type: application/json
 
@@ -9,7 +94,7 @@ content-type: application/json
     "time": 2.0
 }
 
-### GET
+### Wait task GET
 GET http://localhost:5000/task HTTP/1.1
 content-type: application/json
 
@@ -18,7 +103,7 @@ content-type: application/json
 }
 
 
-### DELETE
+### Wait task DELETE
 DELETE http://localhost:5000/task HTTP/1.1
 content-type: application/json
 

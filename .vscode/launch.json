@@ -14,14 +14,14 @@
       "type": "python",
       "request": "launch",
       "program": "${workspaceFolder}/local.py",
-      "args": ["--mode=classify", "--seq=hello world"],
+      "args": ["--mode=classify", "--model=upr-info-issues"]
     },
     {
       "name": "test-this-file",
       "type": "python",
       "request": "launch",
       "module": "pytest",
-      "args": ["${file}"],
+      "args": ["-s", "${file}"],
       "console": "integratedTerminal",
       "internalConsoleOptions": "neverOpen"
     }

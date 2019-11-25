@@ -13,7 +13,10 @@ flask
 pip
 setuptools
 pycodestyle
-autopep8
+flake8
+flake8-quotes
+flake8-isort
+yapf
 ipython
 pyfakefs
 pytest
