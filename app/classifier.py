@@ -1,3 +1,4 @@
+import collections
 import json
 import logging
 import os
@@ -289,26 +290,34 @@ class Classifier:
             self.topic_infos[ti.topic] = ti
 
         sample_quality = self._props_to_quality(sample_probs)
-        error_rates = {}
         for precision in [30, 40, 50, 60, 70, 80, 90]:
             num_complete = 0.0
             sum_extra = 0.0
+            missing_topics: collections.Counter = collections.Counter()
             for i, sample_trains in enumerate(train_labels):
                 num_found = 0
                 for train_topic in sample_trains:
                     sample_qual = sample_quality[i].get(train_topic, 0.0)
                     if sample_qual >= precision / 100.0:
                         num_found += 1
+                    else:
+                        missing_topics[train_topic] += 1
                 if num_found >= len(sample_trains):
                     num_complete += 1
                 sum_extra += len([
                     q for q in sample_quality[i].values()
                     if q >= precision / 100.0
                 ]) - num_found
-            error_rates[precision] = dict(
-                perc_complete=num_complete / len(train_labels),
-                avg_extra=sum_extra / len(train_labels))
-        print(error_rates)
+            print(('%02.0f%% precision -> %02.0f%% complete, ' +
+                   '+%01.1f extra wrong labels') %
+                  (precision, num_complete / len(train_labels) * 100,
+                   sum_extra / len(train_labels)))
+            # precision,
+            # dict(perc_complete=num_complete / len(train_labels),
+            #      avg_extra=sum_extra / len(train_labels)))
+            print(' ', [(k, '%2.0f%%' % (float(v) / len(train_labels) * 100))
+                        for (k, v) in missing_topics.most_common(10)])
+            print()
 
         path_to_thresholds = os.path.join(self.instance_dir, 'thresholds.json')
         with open(path_to_thresholds, 'w') as f:
