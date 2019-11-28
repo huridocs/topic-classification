@@ -51,7 +51,6 @@ def getModels() -> Any:
         return jsonify(models=models)
 
     instances = status.list_model_instances(args['model'])
-    preffered = status.get_preferred_model_instance(args['model'])
+    preferred = status.get_preferred_model_instance(args['model'])
 
-    return jsonify(instances=instances,
-                   preffered=preffered)
+    return jsonify(instances=instances, preferred=preferred)
