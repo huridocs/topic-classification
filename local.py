@@ -1,11 +1,13 @@
 """local.py runs the app's code without starting a server, not used in prod."""
 
+import csv
 import os
-from typing import Any
+from typing import Any, List, Set
 
 from absl import app, flags
 
 from app import classifier, embedder, model_fetcher
+from app.models import ClassificationSample, sessionLock
 
 FLAGS = flags.FLAGS
 
@@ -25,9 +27,35 @@ flags.DEFINE_string(
 flags.DEFINE_integer('limit', 2000,
                      'Max number of classification samples to use')
 
-flags.DEFINE_enum('mode', 'embed',
-                  ['embed', 'classify', 'prefetch', 'thresholds'],
-                  'The operation to perform.')
+flags.DEFINE_enum(
+    'mode', 'classify',
+    ['embed', 'classify', 'prefetch', 'thresholds', 'predict', 'csv'],
+    'The operation to perform.')
+
+
+def outputCsv() -> None:
+    filename = '/tmp/%s_%d.csv' % (FLAGS.model, FLAGS.limit)
+    with sessionLock, open(filename, 'w') as csvFile:
+        writer = csv.writer(csvFile)
+        writer.writerow([
+            'sequence', 'training_labels', 'predicted_sure', 'predicted_unsure',
+            'revised_training_labels'
+        ])
+        samples: List[ClassificationSample] = list(
+            ClassificationSample.query.find(
+                dict(model=FLAGS.model,
+                     use_for_training=True)).sort('-seqHash').limit(
+                         FLAGS.limit))
+        for sample in samples:
+            writer.writerow([
+                sample.seq, ';'.join([l.topic for l in sample.training_labels]),
+                ';'.join([
+                    l.topic for l in sample.predicted_labels if l.quality >= 0.6
+                ]), ';'.join([
+                    l.topic for l in sample.predicted_labels if l.quality < 0.6
+                ]), ''
+            ])
+    print('Wrote %s.' % filename)
 
 
 def main(_: Any) -> None:
@@ -42,6 +70,11 @@ def main(_: Any) -> None:
     elif FLAGS.mode == 'thresholds':
         c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
         c.refresh_thresholds(FLAGS.limit)
+    elif FLAGS.mode == 'predict':
+        c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
+        c.refresh_predictions(FLAGS.limit)
+    elif FLAGS.mode == 'csv':
+        outputCsv()
     elif FLAGS.mode == 'prefetch':
         f = model_fetcher.Fetcher(FLAGS.fetch_config_path)
         dst = f.fetchAll()
