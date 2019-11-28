@@ -25,11 +25,13 @@ def create_app() -> Flask:
         # Include our Routes
         from . import classifier
         from . import embedder
+        from . import model_status
         from . import task_routes
 
         # Register Blueprints
         app.register_blueprint(classifier.classify_bp)
         app.register_blueprint(embedder.embed_bp)
+        app.register_blueprint(model_status.model_status_bp)
         app.register_blueprint(task_routes.task_bp)
 
         return app

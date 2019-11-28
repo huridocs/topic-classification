@@ -2,7 +2,7 @@
 
 import csv
 import os
-from typing import Any, List, Set
+from typing import Any, List
 
 from absl import app, flags
 
