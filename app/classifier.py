@@ -1,10 +1,11 @@
 import collections
+import csv
 import json
 import logging
 import os
 import threading
 from datetime import datetime
-from typing import Any, Dict, List, Set
+from typing import Any, Dict, List, Optional, Set
 
 import numpy as np
 import tensorflow as tf
@@ -268,12 +269,27 @@ class Classifier:
                 false_probs.append(sample_prob)
         return ComputeThresholds(topic, train_probs, false_probs)
 
-    def refresh_thresholds(self, limit: int = 2000) -> None:
+    def refresh_thresholds(self,
+                           limit: int = 2000,
+                           subset_file: Optional[str] = None) -> None:
+        subset_seqs: List[str] = []
+        if subset_file:
+            with open(subset_file, 'r') as subset_handle:
+                subset_seqs = [
+                    row[0]
+                    for row in csv.reader(subset_handle, delimiter=',')
+                    if row
+                ]
+        print(subset_seqs[:10])
         with sessionLock:
             samples: List[ClassificationSample] = list(
                 ClassificationSample.query.find(
                     dict(model=self.model_name,
                          use_for_training=True)).sort('-seqHash').limit(limit))
+            if subset_seqs:
+                samples = [
+                    s for s in samples if any(x in s.seq for x in subset_seqs)
+                ]
             seqs = [s.seq for s in samples]
             train_labels: List[Set[str]] = [
                 set([l.topic for l in s.training_labels]) for s in samples
