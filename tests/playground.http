@@ -110,3 +110,12 @@ content-type: application/json
 {
     "name": "wait_100"
 }
+
+### Model Status
+GET http://localhost:5005/models HTTP/1.1
+content-type: application/json
+
+### Model Instances
+GET http://localhost:5005/models?model=UPR_2percent_ps0 HTTP/1.1
+content-type: application/json
+
