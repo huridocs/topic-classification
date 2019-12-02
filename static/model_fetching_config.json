@@ -6,6 +6,8 @@
   "source_files": [
     "multilabel/{model}/saved_model/{instance}/saved_model.pb",
     "multilabel/{model}/saved_model/{instance}/*.json",
+    "multilabel/{model}/saved_model/{instance}/*.txt",
+    "multilabel/{model}/saved_model/{instance}/*.csv",
     "multilabel/{model}/saved_model/*.vocab"
   ],
   "source_dirs": ["multilabel/{model}/saved_model/{instance}/variables"],
