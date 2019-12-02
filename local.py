@@ -2,7 +2,7 @@
 
 import csv
 import os
-from typing import Any, List
+from typing import Any, List, Tuple
 
 from absl import app, flags
 
@@ -27,34 +27,49 @@ flags.DEFINE_string(
 flags.DEFINE_integer('limit', 2000,
                      'Max number of classification samples to use')
 
+flags.DEFINE_boolean(
+    'csv_diff_only', True,
+    'exclude csv output if training and predicted_sure match.')
+flags.DEFINE_float('csv_sure', 0.6,
+                   'Precision threshold for "sure" output in csv.')
+flags.DEFINE_string(
+    'subset_file', '',
+    'If set, perform threshold learning only on samples which have a sequence '
+    'containing one of the sequences in this csv file.')
+
 flags.DEFINE_enum(
     'mode', 'classify',
     ['embed', 'classify', 'prefetch', 'thresholds', 'predict', 'csv'],
     'The operation to perform.')
 
 
-def outputCsv() -> None:
-    filename = '/tmp/%s_%d.csv' % (FLAGS.model, FLAGS.limit)
-    with sessionLock, open(filename, 'w') as csvFile:
+def outputCsv(c: classifier.Classifier) -> None:
+    filename = '/tmp/%s_%d%s.csv' % (FLAGS.model, FLAGS.limit,
+                                     '_diff' if FLAGS.csv_diff_only else '')
+    with open(filename, 'w') as csvFile:
         writer = csv.writer(csvFile)
         writer.writerow([
             'sequence', 'training_labels', 'predicted_sure', 'predicted_unsure',
             'revised_training_labels'
         ])
-        samples: List[ClassificationSample] = list(
-            ClassificationSample.query.find(
-                dict(model=FLAGS.model,
-                     use_for_training=True)).sort('-seqHash').limit(
-                         FLAGS.limit))
-        for sample in samples:
-            writer.writerow([
-                sample.seq, ';'.join([l.topic for l in sample.training_labels]),
-                ';'.join([
-                    l.topic for l in sample.predicted_labels if l.quality >= 0.6
-                ]), ';'.join([
-                    l.topic for l in sample.predicted_labels if l.quality < 0.6
-                ]), ''
-            ])
+        with sessionLock:
+            samples: List[ClassificationSample] = list(
+                ClassificationSample.query.find(
+                    dict(model=FLAGS.model,
+                         use_for_training=True)).sort('-seqHash').limit(
+                             FLAGS.limit))
+        predicted = c.classify([s.seq for s in samples])
+        for sample, pred in zip(samples, predicted):
+            train_str = ';'.join([l.topic for l in sample.training_labels])
+            sorted_pred: List[Tuple[str, float]] = sorted(pred.items(),
+                                                          key=lambda e: -e[1])
+            pred_sure_str = ';'.join(
+                [t for t, q in sorted_pred if q >= FLAGS.csv_sure])
+            pred_unsure_str = ';'.join(
+                [t for t, q in sorted_pred if q < FLAGS.csv_sure])
+            if not FLAGS.csv_diff_only or train_str != pred_sure_str:
+                writer.writerow(
+                    [sample.seq, train_str, pred_sure_str, pred_unsure_str, ''])
     print('Wrote %s.' % filename)
 
 
@@ -69,12 +84,13 @@ def main(_: Any) -> None:
         print(c.classify([FLAGS.seq, FLAGS.seq + ' 2']))
     elif FLAGS.mode == 'thresholds':
         c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
-        c.refresh_thresholds(FLAGS.limit)
+        c.refresh_thresholds(FLAGS.limit, FLAGS.subset_file)
     elif FLAGS.mode == 'predict':
         c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
         c.refresh_predictions(FLAGS.limit)
     elif FLAGS.mode == 'csv':
-        outputCsv()
+        c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
+        outputCsv(c)
     elif FLAGS.mode == 'prefetch':
         f = model_fetcher.Fetcher(FLAGS.fetch_config_path)
         dst = f.fetchAll()
