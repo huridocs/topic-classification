@@ -2,7 +2,7 @@
 
 import csv
 import os
-from typing import Any, List, Set
+from typing import Any, List
 
 from absl import app, flags
 
@@ -76,7 +76,7 @@ def main(_: Any) -> None:
     elif FLAGS.mode == 'csv':
         outputCsv()
     elif FLAGS.mode == 'prefetch':
-        f = model_fetcher.Fetcher(FLAGS.fetch_config_path)
+        f = model_fetcher.Fetcher(FLAGS.fetch_config_path, FLAGS.model)
         dst = f.fetchAll()
         for l in dst:
             print(l)
