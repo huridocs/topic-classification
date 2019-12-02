@@ -32,6 +32,10 @@ flags.DEFINE_boolean(
     'exclude csv output if training and predicted_sure match.')
 flags.DEFINE_float('csv_sure', 0.6,
                    'Precision threshold for "sure" output in csv.')
+flags.DEFINE_string(
+    'subset_file', '',
+    'If set, perform threshold learning only on samples which have a sequence '
+    'containing one of the sequences in this csv file.')
 
 flags.DEFINE_enum(
     'mode', 'classify',
@@ -80,7 +84,7 @@ def main(_: Any) -> None:
         print(c.classify([FLAGS.seq, FLAGS.seq + ' 2']))
     elif FLAGS.mode == 'thresholds':
         c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
-        c.refresh_thresholds(FLAGS.limit)
+        c.refresh_thresholds(FLAGS.limit, FLAGS.subset_file)
     elif FLAGS.mode == 'predict':
         c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
         c.refresh_predictions(FLAGS.limit)
