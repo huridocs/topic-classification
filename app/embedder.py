@@ -20,6 +20,9 @@ embed_bp = Blueprint('embed_bp', __name__)
 class Embedder:
 
     def __init__(self, bert: str):
+        if not bert:
+            raise Exception('You must provide a bert in order to '
+                            'interact with embeddings.')
         self.bert = bert
         self.logger = logging.getLogger('app.logger')
         self.session: Any = None
