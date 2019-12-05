@@ -18,7 +18,7 @@ pycodestyle
 flake8
 flake8-quotes
 flake8-isort
-yapf
+yapf==0.28.0
 ipython
 pyfakefs==3.6.1
 pytest==5.3.0

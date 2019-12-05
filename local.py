@@ -92,7 +92,7 @@ def main(_: Any) -> None:
         c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
         outputCsv(c)
     elif FLAGS.mode == 'prefetch':
-        f = model_fetcher.Fetcher(FLAGS.fetch_config_path)
+        f = model_fetcher.Fetcher(FLAGS.fetch_config_path, FLAGS.model)
         dst = f.fetchAll()
         for l in dst:
             print(l)
