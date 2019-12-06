@@ -4,12 +4,12 @@
   "model": "",
   "instance": "",
   "source_files": [
-    "multilabel/{model}/saved_model_bert/{instance}/saved_model.pb",
-    "multilabel/{model}/saved_model_bert/{instance}/*.json",
-    "multilabel/{model}/saved_model_bert/{instance}/*.txt",
-    "multilabel/{model}/saved_model_bert/{instance}/*.csv",
-    "multilabel/{model}/saved_model_bert/*.vocab"
+    "multilabel/{model}/saved_bert_model/{instance}/saved_model.pb",
+    "multilabel/{model}/saved_bert_model/{instance}/*.json",
+    "multilabel/{model}/saved_bert_model/{instance}/*.txt",
+    "multilabel/{model}/saved_bert_model/{instance}/*.csv",
+    "multilabel/{model}/saved_bert_model/*.vocab"
   ],
-  "source_dirs": ["multilabel/{model}/saved_model_bert/{instance}/variables"],
+  "source_dirs": ["multilabel/{model}/saved_bert_model/{instance}/variables"],
   "dest_dir": "classifier_models/{model}_bert/{instance}"
 }
