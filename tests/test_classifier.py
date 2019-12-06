@@ -76,9 +76,8 @@ class TestClassifer:
         fs.remove_object('./testdata/test_model/test_instance/config.json')
         fs.create_file('./testdata/test_model/test_instance/config.json',
                        contents=config)
-        with pytest.raises(
-                Exception,
-                match=r"unsupported handle format '{0}'".format(bad_bert_path)):
+        with pytest.raises(Exception,
+                           match='SavedModel file does not exist at'):
             c = Classifier(self.BASE_CLASSIFIER_PATH, 'test_model')
             # Bad bert is only used on uncached embed.
             c.classify(['some string'])
