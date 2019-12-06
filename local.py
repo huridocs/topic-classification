@@ -28,6 +28,10 @@ flags.DEFINE_integer('limit', 2000,
                      'Max number of classification samples to use')
 
 flags.DEFINE_boolean(
+    'probs', False,
+    'If true, output raw probabilities, without using thresholds.')
+
+flags.DEFINE_boolean(
     'csv_diff_only', True,
     'exclude csv output if training and predicted_sure match.')
 flags.DEFINE_float('csv_sure', 0.6,
@@ -81,7 +85,10 @@ def main(_: Any) -> None:
         print([(seq, len(m.tostring())) for seq, m in zip(seqs, ms)])
     elif FLAGS.mode == 'classify':
         c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
-        print(c.classify([FLAGS.seq, FLAGS.seq + ' 2']))
+        if FLAGS.probs:
+            print(c._classify_probs([FLAGS.seq, FLAGS.seq + ' 2']))
+        else:
+            print(c.classify([FLAGS.seq, FLAGS.seq + ' 2']))
     elif FLAGS.mode == 'thresholds':
         c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
         c.refresh_thresholds(FLAGS.limit, FLAGS.subset_file)
