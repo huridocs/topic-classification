@@ -481,13 +481,10 @@ def add_samples() -> Any:
     response = []
 
     c = ClassifierCache.get(app.config['BASE_CLASSIFIER_DIR'], args['model'])
-    with c.lock:
-        probs = c.classify([s['seq'] for s in data['samples']])
 
     with sessionLock:
         for i, sample in enumerate(data['samples']):
             seqHash = hasher(sample['seq'])
-            predicted_labels = Classifier.quality_to_predicted_labels(probs[i])
 
             existing: ClassificationSample = ClassificationSample.query.get(
                 model=args['model'], seqHash=seqHash)
@@ -498,17 +495,20 @@ def add_samples() -> Any:
                 if 'training_labels' in sample:
                     existing.training_labels = sample_labels
                     existing.use_for_training = len(sample_labels) > 0
-                existing.predicted_labels = predicted_labels
             elif seqHash not in processed:
                 response_sample = ClassificationSample(
                     model=args['model'],
                     seq=sample['seq'],
                     seqHash=seqHash,
                     training_labels=sample_labels,
-                    predicted_labels=predicted_labels,
                     use_for_training=len(sample_labels) > 0)
             processed.add(seqHash)
             if response_sample:
+                if not response_sample.predicted_labels:
+                    with c.lock:
+                        response_sample.predicted_labels = (
+                            Classifier.quality_to_predicted_labels(
+                                c.classify([sample['seq']])[0]))
                 response.append(
                     dict(seq=sample['seq'],
                          predicted_labels=response_sample.predicted_labels))
