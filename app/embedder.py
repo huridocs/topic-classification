@@ -154,12 +154,16 @@ class Embedder:
 
         with sessionLock:
             for seq, matrix in zip(undone_seqs, done_seqs):
-                result[hashed_seq_to_index[hasher(seq)]] = matrix
-                # convert npArray to list for storage in MongoDB
-                Embedding(bert=self.bert,
-                          seq=seq,
-                          seqHash=hasher(seq),
-                          embedding=pickle.dumps(matrix))
+                seqHash = hasher(seq)
+                result[hashed_seq_to_index[seqHash]] = matrix
+                # Prevent duplicate key errors since another thread might
+                # have added this embedding.
+                if not Embedding.query.get(bert=self.bert, seqHash=seqHash):
+                    # convert npArray to list for storage in MongoDB
+                    Embedding(bert=self.bert,
+                              seq=seq,
+                              seqHash=seqHash,
+                              embedding=pickle.dumps(matrix))
             session.flush()
         self.logger.info('Stored %d embedding matrices in MongoDB.' %
                          len(done_seqs))
