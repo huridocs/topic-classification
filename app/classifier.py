@@ -213,8 +213,9 @@ class Classifier:
             all_embeddings[i][:len(matrix)] = matrix
             all_input_mask[i][:len(matrix)] = 1
 
-        prediction = self.predictor(
-            dict(embeddings=all_embeddings, input_mask=all_input_mask))
+        with self.lock:
+            prediction = self.predictor(
+                dict(embeddings=all_embeddings, input_mask=all_input_mask))
         probabilities = prediction['probabilities']
         # TODO(bdittes): Use prediction['attention']
         self.logger.debug(probabilities)
@@ -452,13 +453,12 @@ def classify() -> Any:
     args = request.args
 
     c = ClassifierCache.get(app.config['BASE_CLASSIFIER_DIR'], args['model'])
-    with c.lock:
-        # Allow 'probs' to be set in args or data as an option to return
-        # raw probabilities.
-        if 'probs' in args or ('probs' in data and data['probs']):
-            results = c._classify_probs(data['seqs'])
-        else:
-            results = c.classify(data['seqs'])
+    # Allow 'probs' to be set in args or data as an option to return
+    # raw probabilities.
+    if 'probs' in args or ('probs' in data and data['probs']):
+        results = c._classify_probs(data['seqs'])
+    else:
+        results = c.classify(data['seqs'])
     return jsonify(results)
 
 
@@ -482,10 +482,10 @@ def add_samples() -> Any:
 
     c = ClassifierCache.get(app.config['BASE_CLASSIFIER_DIR'], args['model'])
 
-    with sessionLock:
-        for i, sample in enumerate(data['samples']):
-            seqHash = hasher(sample['seq'])
+    for i, sample in enumerate(data['samples']):
+        seqHash = hasher(sample['seq'])
 
+        with sessionLock:
             existing: ClassificationSample = ClassificationSample.query.get(
                 model=args['model'], seqHash=seqHash)
             sample_labels = (sample['training_labels']
@@ -502,18 +502,17 @@ def add_samples() -> Any:
                     seqHash=seqHash,
                     training_labels=sample_labels,
                     use_for_training=len(sample_labels) > 0)
-            processed.add(seqHash)
-            if response_sample:
-                if not response_sample.predicted_labels:
-                    with c.lock:
-                        response_sample.predicted_labels = (
-                            Classifier.quality_to_predicted_labels(
-                                c.classify([sample['seq']])[0]))
-                response.append(
-                    dict(seq=sample['seq'],
-                         predicted_labels=response_sample.predicted_labels))
-        session.flush()
-        return jsonify(dict(samples=response))
+        processed.add(seqHash)
+        if response_sample:
+            if not response_sample.predicted_labels:
+                predicted_labels = (Classifier.quality_to_predicted_labels(
+                    c.classify([sample['seq']])[0]))
+                with sessionLock:
+                    response_sample.predicted_labels = predicted_labels
+            response.append(
+                dict(seq=sample['seq'],
+                     predicted_labels=response_sample.predicted_labels))
+    return jsonify(dict(samples=response))
 
 
 @classify_bp.route('/classification_sample', methods=['GET'])
