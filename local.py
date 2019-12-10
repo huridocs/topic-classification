@@ -59,9 +59,9 @@ def outputCsv(c: classifier.Classifier) -> None:
         with sessionLock:
             samples: List[ClassificationSample] = list(
                 ClassificationSample.query.find(
-                    dict(model=FLAGS.model,
-                         use_for_training=True)).sort('-seqHash').limit(
-                             FLAGS.limit))
+                    dict(model=FLAGS.model, use_for_training=True)).sort([
+                        ('seqHash', -1)
+                    ]).limit(FLAGS.limit))
         predicted = c.classify([s.seq for s in samples])
         for sample, pred in zip(samples, predicted):
             train_str = ';'.join([l.topic for l in sample.training_labels])

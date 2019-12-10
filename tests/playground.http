@@ -1,5 +1,5 @@
 ### Add seqs
-POST http://localhost:5005/classification_sample?model=dummy_model HTTP/1.1
+PUT http://localhost:5005/classification_sample?model=dummy_model HTTP/1.1
 content-type: application/json
 
 {
