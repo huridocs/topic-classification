@@ -36,7 +36,7 @@ def test_e2e(app: Flask, fs: FakeFilesystem) -> None:
         assert len(json.loads(resp.data)[0]) == 0
 
         # now we add training labels
-        assert client.post(
+        assert client.put(
             '/classification_sample?model=test_model',
             data=json.dumps({
                 'samples': [{
