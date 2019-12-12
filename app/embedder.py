@@ -1,6 +1,7 @@
 import logging
 import os
 import pickle
+import threading
 from typing import Any, Dict, List, Optional
 
 import numpy as np
@@ -103,6 +104,7 @@ class Embedder:
         self.bert = bert
         self.logger = logging.getLogger('app.logger')
         self.embedder: Optional[_Embedder] = None
+        self.lock = threading.Lock()
 
     def _init_session(self) -> None:
         """Lazy init of TF session."""
@@ -152,12 +154,16 @@ class Embedder:
 
         with sessionLock:
             for seq, matrix in zip(undone_seqs, done_seqs):
-                result[hashed_seq_to_index[hasher(seq)]] = matrix
-                # convert npArray to list for storage in MongoDB
-                Embedding(bert=self.bert,
-                          seq=seq,
-                          seqHash=hasher(seq),
-                          embedding=pickle.dumps(matrix))
+                seqHash = hasher(seq)
+                result[hashed_seq_to_index[seqHash]] = matrix
+                # Prevent duplicate key errors since another thread might
+                # have added this embedding.
+                if not Embedding.query.get(bert=self.bert, seqHash=seqHash):
+                    # convert npArray to list for storage in MongoDB
+                    Embedding(bert=self.bert,
+                              seq=seq,
+                              seqHash=seqHash,
+                              embedding=pickle.dumps(matrix))
             session.flush()
         self.logger.info('Stored %d embedding matrices in MongoDB.' %
                          len(done_seqs))
@@ -166,7 +172,8 @@ class Embedder:
     def _build_embedding(self, seqs: List[str]) -> List[np.array]:
         if len(seqs) == 0:
             return []
-        self._init_session()
+        with self.lock:
+            self._init_session()
         if not self.embedder:
             raise RuntimeError('Failed to initialize embedder!')
 
@@ -176,7 +183,8 @@ class Embedder:
         all_segment_ids = np.zeros([num_seqs, MAX_SEQ_LENGTH])
 
         for i, seq in enumerate(seqs):
-            tokens = self.embedder.tokenizer.tokenize(seq)
+            with self.lock:
+                tokens = self.embedder.tokenizer.tokenize(seq)
             if len(tokens) > MAX_SEQ_LENGTH - 2:
                 tokens = tokens[:(MAX_SEQ_LENGTH - 2)]
 
@@ -189,7 +197,9 @@ class Embedder:
 
             # per word, get IDs from vocab file
             # e.g. [980234, 8792450, 132, 5002]
-            input_ids = self.embedder.tokenizer.convert_tokens_to_ids(tokens)
+            with self.lock:
+                input_ids = self.embedder.tokenizer.convert_tokens_to_ids(
+                    tokens)
 
             # The mask has 1 for real tokens and 0 for padding tokens. Only real
             # tokens are attended to.
@@ -209,8 +219,9 @@ class Embedder:
             all_input_masks[i] = input_mask
             all_segment_ids[i] = segment_ids
 
-        all_embeddings = self.embedder.embed(all_input_ids, all_input_masks,
-                                             all_segment_ids)
+        with self.lock:
+            all_embeddings = self.embedder.embed(all_input_ids, all_input_masks,
+                                                 all_segment_ids)
         out: List[np.ndarray] = [None] * num_seqs
         for i in range(len(seqs)):
             out[i] = all_embeddings[i][:int(sum(all_input_masks[i]))]

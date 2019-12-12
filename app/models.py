@@ -15,7 +15,7 @@ DATABASE_NAME = environ[
 
 datastore = create_datastore(DBHOST + '/' + DATABASE_NAME)
 session = ODMSession(bind=datastore, autoflush=False)
-sessionLock = threading.Lock()
+sessionLock = threading.RLock()
 
 
 def hasher(seq: str) -> str:

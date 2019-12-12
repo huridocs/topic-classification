@@ -213,8 +213,9 @@ class Classifier:
             all_embeddings[i][:len(matrix)] = matrix
             all_input_mask[i][:len(matrix)] = 1
 
-        prediction = self.predictor(
-            dict(embeddings=all_embeddings, input_mask=all_input_mask))
+        with self.lock:
+            prediction = self.predictor(
+                dict(embeddings=all_embeddings, input_mask=all_input_mask))
         probabilities = prediction['probabilities']
         # TODO(bdittes): Use prediction['attention']
         self.logger.debug(probabilities)
@@ -284,8 +285,9 @@ class Classifier:
         with sessionLock:
             samples: List[ClassificationSample] = list(
                 ClassificationSample.query.find(
-                    dict(model=self.model_name,
-                         use_for_training=True)).sort('-seqHash').limit(limit))
+                    dict(model=self.model_name, use_for_training=True)).sort([
+                        ('seqHash', -1)
+                    ]).limit(limit))
             if subset_seqs:
                 samples = [
                     s for s in samples if any(x in s.seq for x in subset_seqs)
@@ -344,22 +346,27 @@ class Classifier:
                     indent=4,
                     sort_keys=True))
 
+    @staticmethod
+    def quality_to_predicted_labels(sample_probs: Dict[str, float]
+                                    ) -> List[Any]:
+        return sorted(
+            [dict(topic=t, quality=q) for t, q in sample_probs.items()],
+            key=lambda o: -o['quality'])
+
     def refresh_predictions(self, limit: int = 2000) -> None:
         with sessionLock:
             samples: List[ClassificationSample] = list(
                 ClassificationSample.query.find(
-                    dict(model=self.model_name)).sort('-seqHash').limit(limit))
+                    dict(model=self.model_name)).sort([('seqHash', -1)
+                                                       ]).limit(limit))
             seqs = [s.seq for s in samples]
 
         sample_probs = self.classify(seqs)
 
         with sessionLock:
             for i, sample in enumerate(samples):
-                sample.predicted_labels = sorted([
-                    dict(topic=t, quality=q)
-                    for t, q in sample_probs[i].items()
-                ],
-                                                 key=lambda o: -o['quality'])
+                sample.predicted_labels = (
+                    Classifier.quality_to_predicted_labels(sample_probs[i]))
             session.flush()
 
 
@@ -446,24 +453,24 @@ def classify() -> Any:
     args = request.args
 
     c = ClassifierCache.get(app.config['BASE_CLASSIFIER_DIR'], args['model'])
-    with c.lock:
-        # Allow 'probs' to be set in args or data as an option to return
-        # raw probabilities.
-        if 'probs' in args or ('probs' in data and data['probs']):
-            results = c._classify_probs(data['seqs'])
-        else:
-            results = c.classify(data['seqs'])
+    # Allow 'probs' to be set in args or data as an option to return
+    # raw probabilities.
+    if 'probs' in args or ('probs' in data and data['probs']):
+        results = c._classify_probs(data['seqs'])
+    else:
+        results = c.classify(data['seqs'])
     return jsonify(results)
 
 
-@classify_bp.route('/classification_sample', methods=['POST'])
+@classify_bp.route('/classification_sample', methods=['PUT'])
 def add_samples() -> Any:
     # request.args: &model=upr-info_issues
-    # request.get_json: {'samples': [{'seq'="hello world',
-    #                                 'training_labels'=[
+    # request.get_json: {'samples': [{'seq': "hello world',
+    #                                 'training_labels'?: [
     #                                     {'topic':"Murder},
     #                                     {'topic': 'Justice'}]},
     #                                ...] }
+    # returns {'samples': [{'seq': "hello world", "predicted_labels": [...]}]}
     data = request.get_json()
     args = request.args
 
@@ -471,28 +478,41 @@ def add_samples() -> Any:
         raise Exception('You need to pass &model=...')
 
     processed: Set[str] = set()
+    response = []
 
-    with sessionLock:
-        for sample in data['samples']:
-            sample_labels = (sample['training_labels']
-                             if 'training_labels' in sample else [])
-            seqHash = hasher(sample['seq'])
-            if seqHash in processed:
-                continue
-            processed.add(seqHash)
+    c = ClassifierCache.get(app.config['BASE_CLASSIFIER_DIR'], args['model'])
+
+    for i, sample in enumerate(data['samples']):
+        seqHash = hasher(sample['seq'])
+
+        with sessionLock:
             existing: ClassificationSample = ClassificationSample.query.get(
                 model=args['model'], seqHash=seqHash)
+            sample_labels = (sample['training_labels']
+                             if 'training_labels' in sample else [])
             if existing:
-                existing.training_labels = sample_labels
-                existing.use_for_training = len(sample_labels) > 0
-            else:
-                ClassificationSample(model=args['model'],
-                                     seq=sample['seq'],
-                                     seqHash=seqHash,
-                                     training_labels=sample_labels,
-                                     use_for_training=len(sample_labels) > 0)
-        session.flush()
-        return jsonify({})
+                response_sample = existing
+                if 'training_labels' in sample:
+                    existing.training_labels = sample_labels
+                    existing.use_for_training = len(sample_labels) > 0
+            elif seqHash not in processed:
+                response_sample = ClassificationSample(
+                    model=args['model'],
+                    seq=sample['seq'],
+                    seqHash=seqHash,
+                    training_labels=sample_labels,
+                    use_for_training=len(sample_labels) > 0)
+        processed.add(seqHash)
+        if response_sample:
+            if not response_sample.predicted_labels:
+                predicted_labels = (Classifier.quality_to_predicted_labels(
+                    c.classify([sample['seq']])[0]))
+                with sessionLock:
+                    response_sample.predicted_labels = predicted_labels
+            response.append(
+                dict(seq=sample['seq'],
+                     predicted_labels=response_sample.predicted_labels))
+    return jsonify(dict(samples=response))
 
 
 @classify_bp.route('/classification_sample', methods=['GET'])
@@ -500,9 +520,9 @@ def get_samples() -> Any:
     # request.args: &model=upr-info_issues&seq=*[&limit=123]
     args = request.args
 
-    if not args['model']:
+    if 'model' not in args:
         raise Exception('You need to pass &model=...')
-    if not args['seq']:
+    if 'seq' not in args:
         raise Exception('You need to pass &seq=...')
     limit = int(args['limit']) if 'limit' in args else 1000
 

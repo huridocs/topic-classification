@@ -7,7 +7,7 @@ from typing import Any, List, Tuple
 from absl import app, flags
 
 from app import classifier, embedder, model_fetcher
-from app.models import ClassificationSample, sessionLock
+from app.models import ClassificationSample, hasher, session, sessionLock
 
 FLAGS = flags.FLAGS
 
@@ -43,7 +43,7 @@ flags.DEFINE_string(
 
 flags.DEFINE_enum(
     'mode', 'classify',
-    ['embed', 'classify', 'prefetch', 'thresholds', 'predict', 'csv'],
+    ['embed', 'classify', 'prefetch', 'thresholds', 'predict', 'csv', 'import'],
     'The operation to perform.')
 
 
@@ -59,9 +59,9 @@ def outputCsv(c: classifier.Classifier) -> None:
         with sessionLock:
             samples: List[ClassificationSample] = list(
                 ClassificationSample.query.find(
-                    dict(model=FLAGS.model,
-                         use_for_training=True)).sort('-seqHash').limit(
-                             FLAGS.limit))
+                    dict(model=FLAGS.model, use_for_training=True)).sort([
+                        ('seqHash', -1)
+                    ]).limit(FLAGS.limit))
         predicted = c.classify([s.seq for s in samples])
         for sample, pred in zip(samples, predicted):
             train_str = ';'.join([l.topic for l in sample.training_labels])
@@ -75,6 +75,31 @@ def outputCsv(c: classifier.Classifier) -> None:
                 writer.writerow(
                     [sample.seq, train_str, pred_sure_str, pred_unsure_str, ''])
     print('Wrote %s.' % filename)
+
+
+def importPLANreview() -> None:
+    with open(
+            'classifier_models/planinternational-themes/'
+            '1575552939/PLAN_review.csv', 'r') as csvFile, sessionLock:
+        for row in csv.DictReader(csvFile):
+            seq = row['text']
+            seqHash = hasher(seq)
+            training_labels: List[str] = eval(row['true_label'])
+            existing: ClassificationSample = ClassificationSample.query.get(
+                model=FLAGS.model, seqHash=seqHash)
+            if not existing:
+                existing = ClassificationSample(model=FLAGS.model,
+                                                seq=seq,
+                                                seqHash=seqHash)
+            if existing.training_labels:
+                print('training label change', existing.training_labels,
+                      training_labels)
+            else:
+                existing.training_labels = [
+                    dict(topic=l) for l in training_labels
+                ]
+                existing.use_for_training = len(training_labels) > 0
+        session.flush()
 
 
 def main(_: Any) -> None:
@@ -103,6 +128,8 @@ def main(_: Any) -> None:
         dst = f.fetchAll()
         for l in dst:
             print(l)
+    elif FLAGS.mode == 'import_plan':
+        importPLANreview()
     return
 
 
