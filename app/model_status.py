@@ -20,8 +20,13 @@ class ModelStatus:
         return sorted(os.listdir(self.base_classifier_dir))
 
     def list_model_instances(self, model_name: str) -> List[str]:
-        model_dir = os.path.join(self.base_classifier_dir, model_name)
-        return sorted(os.listdir(model_dir))
+        try:
+            model_dir = os.path.join(self.base_classifier_dir, model_name)
+            return sorted(os.listdir(model_dir))
+        except Exception:
+            self.logger.info('No model %s found in classifier directory=%s' %
+                             (model_name, self.base_classifier_dir))
+            return []
 
     def get_preferred_model_instance(self, model_name: str) -> str:
         instances = self.list_model_instances(model_name)
@@ -29,10 +34,10 @@ class ModelStatus:
             try:
                 with open(
                         os.path.join(self.base_classifier_dir, model_name, i,
-                                    'config.json')) as f:
-                        d = json.loads(f.read())
-                        if d['is_released']:
-                            return i
+                                     'config.json')) as f:
+                    d = json.loads(f.read())
+                    if d['is_released']:
+                        return i
             except Exception:
                 self.logger.info("Instance config wasn\'t loadable.")
         return ''
@@ -41,18 +46,18 @@ class ModelStatus:
         # TODO: make this real
         return 'a bert'
 
-    def get_num_training_samples(
-            self, model_name: str, instance_name: str) -> int:
+    def get_num_training_samples(self, model_name: str,
+                                 instance_name: str) -> int:
         # TODO: make this real
         return 1000
 
-    def get_completeness_score(
-            self, model_name: str, instance_name: str) -> float:
+    def get_completeness_score(self, model_name: str,
+                               instance_name: str) -> float:
         # TODO: make this real
         return 0.99
 
-    def get_extraneous_wrong_values(
-            self, model_name: str, instance_name: str) -> float:
+    def get_extraneous_wrong_values(self, model_name: str,
+                                    instance_name: str) -> float:
         # TODO: make this real
         return 1
 
@@ -73,13 +78,16 @@ def getModels() -> Any:
 
     if model:
         instances = status.list_model_instances(model)
+        if not instances:
+            return jsonify(name=model, error='Invalid model name %s' % model)
         preferred = status.get_preferred_model_instance(model)
 
         bert = status.get_bert(model, preferred)
         samples = status.get_num_training_samples(model, preferred)
         completeness = status.get_completeness_score(model, preferred)
         extraneous = status.get_extraneous_wrong_values(model, preferred)
-        return jsonify(instances=instances,
+        return jsonify(name=model,
+                       instances=instances,
                        preferred=preferred,
                        bert=bert,
                        samples=samples,
@@ -92,14 +100,19 @@ def getModels() -> Any:
         instances = status.list_model_instances(m)
         preferred = status.get_preferred_model_instance(m)
         results[m] = {
-             'instances': instances,
-             'preferred': preferred,
+            'name': m,
+            'instances': instances,
+            'preferred': preferred,
         }
         if preferred:
             results[m].update({
-                'bert': status.get_bert(m, preferred),
-                'samples': status.get_num_training_samples(m, preferred),
-                'completeness': status.get_completeness_score(m, preferred),
-                'extraneous': status.get_extraneous_wrong_values(m, preferred),
+                'bert':
+                    status.get_bert(m, preferred),
+                'samples':
+                    str(status.get_num_training_samples(m, preferred)),
+                'completeness':
+                    str(status.get_completeness_score(m, preferred)),
+                'extraneous':
+                    str(status.get_extraneous_wrong_values(m, preferred)),
             })
     return jsonify(results)
