@@ -61,6 +61,24 @@ class TopicInfo:
         return '\n'.join(res)
 
 
+def compute_precision(true_pos: float, false_pos: float) -> float:
+    if true_pos + false_pos > 0:
+        return true_pos / (true_pos + false_pos)
+    return 0.0
+
+
+def compute_recall(true_pos: float, train_probs: List[float]) -> float:
+    if len(train_probs) > 0:
+        return true_pos / len(train_probs)
+    return 0.0
+
+
+def compute_f1(precision: float, recall: float) -> float:
+    if precision + recall > 0:
+        return 2 * precision * recall / (precision + recall)
+    return 0.0
+
+
 def ComputeThresholds(topic: str, train_probs: List[float],
                       false_probs: List[float]) -> TopicInfo:
 
@@ -72,10 +90,10 @@ def ComputeThresholds(topic: str, train_probs: List[float],
 
         true_pos = sum([1.0 for p in train_probs if p >= thres])
         false_pos = sum([1.0 for p in false_probs if p >= thres])
-        precision = true_pos / (true_pos + false_pos) if true_pos + false_pos > 0 else 0
-        recall = true_pos / len(train_probs) if (len(train_probs) > 0) else 0
-        f1 = 2 * precision * recall / (precision + recall) if (
-            precision + recall) > 0 else 0
+
+        precision = compute_precision(true_pos, false_pos)
+        recall = compute_recall(true_pos, train_probs)
+        f1 = compute_f1(precision, recall)
 
         # Only increase suggested_threshold until precision hits 50%
         if (precision >= 0.3 and f1 > ti.f1_quality_at_suggested and
