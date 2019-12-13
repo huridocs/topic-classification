@@ -63,20 +63,17 @@ class TopicInfo:
 
 def ComputeThresholds(topic: str, train_probs: List[float],
                       false_probs: List[float]) -> TopicInfo:
-    all_probs = train_probs + false_probs
-    all_probs.sort()
+
     ti = TopicInfo(topic)
     ti.num_samples = len(train_probs)
 
-    # No point in learning from too few samples.
-    if ti.num_samples < 10:
-        return ti
+    # keep threshold in range with minimum 0.05 and maximum 0.95
+    for thres in np.arange(0.05, 1, 0.05):
 
-    for thres in all_probs:
         true_pos = sum([1.0 for p in train_probs if p >= thres])
         false_pos = sum([1.0 for p in false_probs if p >= thres])
-        precision = true_pos / (true_pos + false_pos)
-        recall = true_pos / len(train_probs)
+        precision = true_pos / (true_pos + false_pos) if true_pos + false_pos > 0 else 0
+        recall = true_pos / len(train_probs) if (len(train_probs) > 0) else 0
         f1 = 2 * precision * recall / (precision + recall) if (
             precision + recall) > 0 else 0
 
@@ -87,10 +84,15 @@ def ComputeThresholds(topic: str, train_probs: List[float],
             ti.f1_quality_at_suggested = f1
             ti.suggested_threshold = thres
 
+            # Choose default threshold for categories with too less samples
+            if ti.num_samples < 10:
+                return ti
+
         for target in [20, 30, 40, 50, 60, 70, 80, 90]:
             if (target not in ti.thresholds and precision >= target / 100.0):
                 ti.thresholds[target] = thres
                 ti.recalls[target] = recall
+
     return ti
 
 
@@ -288,6 +290,7 @@ class Classifier:
                     dict(model=self.model_name, use_for_training=True)).sort([
                         ('seqHash', -1)
                     ]).limit(limit))
+
             if subset_seqs:
                 samples = [
                     s for s in samples if any(x in s.seq for x in subset_seqs)
@@ -296,7 +299,6 @@ class Classifier:
             train_labels: List[Set[str]] = [
                 set([l.topic for l in s.training_labels]) for s in samples
             ]
-
         sample_probs = self._classify_probs(seqs)
 
         # TODO(bdittes): Enable multiprocessing.
