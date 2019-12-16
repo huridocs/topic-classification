@@ -1,20 +1,41 @@
-import json
 import logging
 import os
-from typing import Any, List
+from typing import Any, Dict, List
 
 from flask import Blueprint
 from flask import current_app as app
 from flask import jsonify, request
+
+from app.classifier import Classifier, TopicInfo
+
+PRECISION = 30
 
 model_status_bp = Blueprint('model_status_bp', __name__)
 
 
 class ModelStatus:
 
-    def __init__(self, base_classifier_dir: str) -> None:
+    class TopicStatus:
+
+        def __init__(self, topic_name: str, topic_infos: TopicInfo):
+            self.topic_name = topic_name
+            self.info = topic_infos
+
+    def __init__(self, base_classifier_dir: str, model_name: str = '') -> None:
         self.logger = logging.getLogger()
         self.base_classifier_dir = base_classifier_dir
+        self.model_name = model_name
+        if self.model_name:
+            try:
+                self.classifier = Classifier(
+                    self.base_classifier_dir, model_name)
+                self.topic_infos: Dict[str, ModelStatus.TopicStatus] = {}
+                for t, ti in self.classifier.topic_infos.items():
+                    self.topic_infos[t] = ModelStatus.TopicStatus(t, ti)
+            except Exception:
+                self.logger.info(
+                    'No model %s found in classifier directory=%s' %
+                    (model_name, self.base_classifier_dir))
 
     def list_potential_models(self) -> List[str]:
         return sorted(os.listdir(self.base_classifier_dir))
@@ -28,36 +49,21 @@ class ModelStatus:
                              (model_name, self.base_classifier_dir))
             return []
 
-    def get_preferred_model_instance(self, model_name: str) -> str:
-        instances = self.list_model_instances(model_name)
-        for i in sorted(instances, reverse=True):
-            try:
-                with open(
-                        os.path.join(self.base_classifier_dir, model_name, i,
-                                     'config.json')) as f:
-                    d = json.loads(f.read())
-                    if d['is_released']:
-                        return i
-            except Exception:
-                self.logger.info("Instance config wasn\'t loadable.")
-        return ''
+    def get_preferred_model_instance(self) -> str:
+        return self.classifier.instance if self.model_name else ''
 
-    def get_bert(self, model_name: str, instance_name: str) -> str:
-        # TODO: make this real
-        return 'a bert'
+    def get_bert(self) -> str:
+        return self.classifier.instance_config.bert if self.model_name else ''
 
-    def get_num_training_samples(self, model_name: str,
-                                 instance_name: str) -> int:
+    def get_num_training_samples(self, topic: str) -> int:
         # TODO: make this real
         return 1000
 
-    def get_completeness_score(self, model_name: str,
-                               instance_name: str) -> float:
+    def get_completeness_score(self, topic: str) -> float:
         # TODO: make this real
         return 0.99
 
-    def get_extraneous_wrong_values(self, model_name: str,
-                                    instance_name: str) -> float:
+    def get_extraneous_wrong_values(self, topic: str) -> float:
         # TODO: make this real
         return 1
 
@@ -77,42 +83,51 @@ def getModels() -> Any:
         return jsonify(models=models)
 
     if model:
+        status = ModelStatus(
+                app.config['BASE_CLASSIFIER_DIR'], model_name=model)
         instances = status.list_model_instances(model)
         if not instances:
             return jsonify(name=model, error='Invalid model name %s' % model)
-        preferred = status.get_preferred_model_instance(model)
+        preferred = status.get_preferred_model_instance()
 
-        bert = status.get_bert(model, preferred)
-        samples = status.get_num_training_samples(model, preferred)
-        completeness = status.get_completeness_score(model, preferred)
-        extraneous = status.get_extraneous_wrong_values(model, preferred)
+        bert = status.get_bert()
+        topics = {}
+        quality_at_precision = status.classifier.refresh_thresholds()
+        for t, ti in status.classifier.topic_infos.items():
+            topics[t] = {
+                'name': t,
+                'samples': ti.num_samples,
+                'completeness': quality_at_precision[PRECISION]['completeness'],
+                'extraneous': quality_at_precision[PRECISION]['extra'],
+            }
         return jsonify(name=model,
                        instances=instances,
                        preferred=preferred,
                        bert=bert,
-                       samples=samples,
-                       completeness=completeness,
-                       extraneous=extraneous)
+                       topics=topics)
 
-    results = {}
+    results: Dict[str, Any] = {}
     # TODO: Add typesjson to fix type problems in the results dict.
     for m in models:
+        status = ModelStatus(app.config['BASE_CLASSIFIER_DIR'], model_name=m)
         instances = status.list_model_instances(m)
-        preferred = status.get_preferred_model_instance(m)
+        preferred = status.get_preferred_model_instance()
         results[m] = {
             'name': m,
             'instances': instances,
             'preferred': preferred,
         }
         if preferred:
-            results[m].update({
-                'bert':
-                    status.get_bert(m, preferred),
-                'samples':
-                    str(status.get_num_training_samples(m, preferred)),
-                'completeness':
-                    str(status.get_completeness_score(m, preferred)),
-                'extraneous':
-                    str(status.get_extraneous_wrong_values(m, preferred)),
-            })
+            quality_at_precision = status.classifier.refresh_thresholds()
+            topics = {}
+            for t, ti in status.classifier.topic_infos.items():
+                topics[t] = {
+                    'name': t,
+                    'samples': ti.num_samples,
+                    'completeness': (
+                            quality_at_precision[PRECISION]['completeness']),
+                    'extraneous': quality_at_precision[PRECISION]['extra'],
+                }
+
+            results[m]['topics'] = topics
     return jsonify(results)
