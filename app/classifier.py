@@ -291,11 +291,9 @@ class Classifier:
         return ComputeThresholds(topic, train_probs, false_probs)
 
     def _quality_at_precision(
-            self,
-            precision: int,
-            sample_quality: List[Dict[str, float]],
-            train_labels: List[Set[str]]) -> Tuple[
-                int, float, float, collections.Counter]:
+            self, precision: int, sample_quality: List[Dict[str, float]],
+            train_labels: List[Set[str]]
+    ) -> Tuple[int, float, float, collections.Counter]:
         num_complete = 0.0
         sum_extra = 0.0
         missing_topics: collections.Counter = collections.Counter()
@@ -310,17 +308,17 @@ class Classifier:
             if num_found >= len(sample_trains):
                 num_complete += 1
             sum_extra += len([
-                q for q in sample_quality[i].values()
-                if q >= precision / 100.0
+                q for q in sample_quality[i].values() if q >= precision / 100.0
             ]) - num_found
 
         completeness = num_complete / len(train_labels) * 100
         extra = sum_extra / len(train_labels)
         return (precision, completeness, extra, missing_topics)
 
-    def refresh_thresholds(
-            self, limit: int = 2000, subset_file: Optional[str] = None) -> Dict[
-                int, Dict[str, Any]]:
+    def refresh_thresholds(self,
+                           limit: int = 2000,
+                           subset_file: Optional[str] = None
+                           ) -> Dict[int, Dict[str, Any]]:
         subset_seqs: List[str] = []
         if subset_file:
             with open(subset_file, 'r') as subset_handle:
@@ -357,15 +355,15 @@ class Classifier:
 
         sample_quality = self._props_to_quality(sample_probs)
 
-        precision_quality: Dict[int, Dict[
-                str,  Any]] = {}
+        precision_quality: Dict[int, Dict[str, Any]] = {}
         for precision in [30, 40, 50, 60, 70, 80, 90]:
             _, completeness, extra, missing_topics = self._quality_at_precision(
-                    precision, sample_quality, train_labels)
+                precision, sample_quality, train_labels)
             precision_quality[precision] = {
                 'completeness': completeness,
                 'extra': extra,
-                'missing': missing_topics}
+                'missing': missing_topics
+            }
 
             # print(('%02.0f%% precision -> %02.0f%% complete, ' +
             #        '+%01.1f extra wrong labels') %

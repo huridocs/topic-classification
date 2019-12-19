@@ -36,7 +36,7 @@ class TestModelStatus:
         model = 'test_model'
         fs.add_real_directory('./testdata/test_model/test_instance')
         fs.add_real_directory('./testdata/test_model/test_instance_unreleased')
-        s = ModelStatus(self.BASE_CLASSIFIER_PATH)
+        s = ModelStatus(self.BASE_CLASSIFIER_PATH, model)
 
-        result = s.get_preferred_model_instance(model)
+        result = s.get_preferred_model_instance()
         assert result == 'test_instance'

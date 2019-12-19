@@ -27,8 +27,8 @@ class ModelStatus:
         self.model_name = model_name
         if self.model_name:
             try:
-                self.classifier = Classifier(
-                    self.base_classifier_dir, model_name)
+                self.classifier = Classifier(self.base_classifier_dir,
+                                             model_name)
                 self.topic_infos: Dict[str, ModelStatus.TopicStatus] = {}
                 for t, ti in self.classifier.topic_infos.items():
                     self.topic_infos[t] = ModelStatus.TopicStatus(t, ti)
@@ -83,8 +83,8 @@ def getModels() -> Any:
         return jsonify(models=models)
 
     if model:
-        status = ModelStatus(
-                app.config['BASE_CLASSIFIER_DIR'], model_name=model)
+        status = ModelStatus(app.config['BASE_CLASSIFIER_DIR'],
+                             model_name=model)
         instances = status.list_model_instances(model)
         if not instances:
             return jsonify(name=model, error='Invalid model name %s' % model)
@@ -124,8 +124,8 @@ def getModels() -> Any:
                 topics[t] = {
                     'name': t,
                     'samples': ti.num_samples,
-                    'completeness': (
-                            quality_at_precision[PRECISION]['completeness']),
+                    'completeness':
+                        (quality_at_precision[PRECISION]['completeness']),
                     'extraneous': quality_at_precision[PRECISION]['extra'],
                 }
 
