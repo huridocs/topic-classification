@@ -219,9 +219,10 @@ class Classifier:
             return []
         # Split very large requests into chunks since
         # (intermediate) bert data is huge.
-        if len(seqs) > 1000:
-            return (self._classify_probs(seqs[:1000]) +
-                    self._classify_probs(seqs[1000:]))
+        BATCH_SIZE = 200
+        if len(seqs) > BATCH_SIZE:
+            return (self._classify_probs(seqs[:BATCH_SIZE]) +
+                    self._classify_probs(seqs[BATCH_SIZE:]))
 
         embeddings = self.embedder.get_embedding(seqs)
         embedding_shape = embeddings[0].shape
