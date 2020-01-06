@@ -2,7 +2,7 @@
 
 import csv
 import os
-from typing import Any, List, Tuple
+from typing import Any, Dict, Iterator, List, Tuple
 
 from absl import app, flags
 
@@ -51,13 +51,11 @@ flags.DEFINE_string(
     'If a path to a csv file is given, its data will be loaded, classified '
     'and the results are written to a new csv file')
 
-flags.DEFINE_string(
-    'text_col', 'text',
-    'column name of the text data in a csv file')
+flags.DEFINE_string('text_col', 'text',
+                    'column name of the text data in a csv file')
 
-flags.DEFINE_string(
-    'label_col', '',
-    'column name of the label data in a csv file')
+flags.DEFINE_string('label_col', '',
+                    'column name of the label data in a csv file')
 
 
 def outputCsv(c: classifier.Classifier) -> None:
@@ -96,10 +94,10 @@ def importData(path: str, text_col: str, label_col: str) -> None:
             seq = row[text_col]
             seqHash = hasher(seq)
 
-            training_labels: List[str] = []
+            training_labels: List[Dict[str, float]] = []
             if label_col != '':
-                training_labels = eval(row[label_col])
-                training_labels = [dict(topic=l) for l in training_labels]
+                training_label_list = eval(row[label_col])
+                training_labels = [dict(topic=l) for l in training_label_list]
 
             existing: ClassificationSample = ClassificationSample.query.get(
                 model=FLAGS.model, seqHash=seqHash)
@@ -114,7 +112,7 @@ def importData(path: str, text_col: str, label_col: str) -> None:
         session.flush()
 
 
-def load_csv(path):
+def load_csv(path: str) -> Iterator[List[str]]:
     with open(FLAGS.csv, 'r') as csvFile:
         reader = csv.reader(csvFile, delimiter=',')
         for row in reader:
