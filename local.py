@@ -57,6 +57,9 @@ flags.DEFINE_string('text_col', 'text',
 flags.DEFINE_string('label_col', '',
                     'column name of the label data in a csv file')
 
+flags.DEFINE_string('sharedId_col', '',
+                    'column name of the sharedId in the csv file')
+
 
 def outputCsv(c: classifier.Classifier) -> None:
     filename = '/tmp/%s_%d%s.csv' % (FLAGS.model, FLAGS.limit,
@@ -64,8 +67,8 @@ def outputCsv(c: classifier.Classifier) -> None:
     with open(filename, 'w') as csvFile:
         writer = csv.writer(csvFile)
         writer.writerow([
-            'sequence', 'training_labels', 'predicted_sure', 'predicted_unsure',
-            'revised_training_labels'
+            'sharedId', 'sequence', 'training_labels', 'predicted_sure',
+            'predicted_unsure', 'revised_training_labels'
         ])
         with sessionLock:
             samples: List[ClassificationSample] = list(
@@ -83,12 +86,15 @@ def outputCsv(c: classifier.Classifier) -> None:
             pred_unsure_str = ';'.join(
                 [t for t, q in sorted_pred if q < FLAGS.csv_sure])
             if not FLAGS.csv_diff_only or train_str != pred_sure_str:
-                writer.writerow(
-                    [sample.seq, train_str, pred_sure_str, pred_unsure_str, ''])
+                writer.writerow([
+                    sample.sharedId, sample.seq, train_str, pred_sure_str,
+                    pred_unsure_str, ''
+                ])
     print('Wrote %s.' % filename)
 
 
-def importData(path: str, text_col: str, label_col: str) -> None:
+def importData(path: str, text_col: str, label_col: str,
+               sharedId_col: str) -> None:
     with open(path, 'r') as csvFile, sessionLock:
         for row in csv.DictReader(csvFile):
             seq = row[text_col]
@@ -99,13 +105,18 @@ def importData(path: str, text_col: str, label_col: str) -> None:
                 training_label_list = eval(row[label_col])
                 training_labels = [dict(topic=l) for l in training_label_list]
 
+            sharedId = ''
+            if sharedId_col != '':
+                sharedId = row[sharedId_col]
+
             existing: ClassificationSample = ClassificationSample.query.get(
                 model=FLAGS.model, seqHash=seqHash)
             if not existing:
                 existing = ClassificationSample(model=FLAGS.model,
                                                 seq=seq,
                                                 seqHash=seqHash,
-                                                training_labels=training_labels)
+                                                training_labels=training_labels,
+                                                sharedId=sharedId)
             else:
                 existing.training_labels = training_labels
             existing.use_for_training = len(training_labels) > 0
@@ -146,7 +157,8 @@ def main(_: Any) -> None:
         for l in dst:
             print(l)
     elif FLAGS.mode == 'import':
-        importData(FLAGS.csv, FLAGS.text_col, FLAGS.label_col)
+        importData(FLAGS.csv, FLAGS.text_col, FLAGS.label_col,
+                   FLAGS.sharedId_col)
     return
 
 
