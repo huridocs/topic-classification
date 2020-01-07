@@ -316,7 +316,11 @@ class Trainer:
         estimator = tf.estimator.Estimator(model_fn=model_fn, config=run_config)
 
         print('***** Started training at {} *****'.format(datetime.now()))
-        train_input_fn = input_fn_builder(train_examples, num_classes, embedder)
+        train_input_fn = input_fn_builder(train_examples,
+                                          num_classes,
+                                          embedder,
+                                          is_training=True,
+                                          drop_remainder=False)
 
         saved_model_path = os.path.join(train_path, 'saved_models')
         estimator.train(input_fn=train_input_fn, steps=num_train_steps)

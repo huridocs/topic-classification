@@ -18,6 +18,8 @@ flags.DEFINE_string('classifier_dir', './classifier_models',
                     'The dir containing classifier models.')
 flags.DEFINE_string('model', 'UPR_2percent_ps0',
                     'The model trained for a particular label set.')
+flags.DEFINE_string('instance', '',
+                    'If set, force the given instance dir, e.g. "1578385362".')
 flags.DEFINE_string('seq', 'increase efforts to end forced disappearance',
                     'The string sequence to process')
 flags.DEFINE_string(
@@ -28,10 +30,6 @@ flags.DEFINE_integer('limit', 2000,
                      'Max number of classification samples to use')
 flags.DEFINE_integer('train_steps', 1000, 'Number of training iterations.')
 flags.DEFINE_float('train_ratio', 0.9, 'Train / eval split of labeled data.')
-flags.DEFINE_string(
-    'train_instance', '',
-    'Force a given instance dir (e.g. to continue training). Example: "1578385362"'
-)
 
 flags.DEFINE_boolean(
     'probs', False,
@@ -115,19 +113,35 @@ def main(_: Any) -> None:
         ms = e.get_embedding(seqs)
         print([(seq, len(m.tostring())) for seq, m in zip(seqs, ms)])
     elif FLAGS.mode == 'classify':
-        c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
+        c = classifier.Classifier(
+            FLAGS.classifier_dir,
+            FLAGS.model,
+            forced_instance=FLAGS.instance,
+        )
         if FLAGS.probs:
             print(c._classify_probs([FLAGS.seq, FLAGS.seq + ' 2']))
         else:
             print(c.classify([FLAGS.seq, FLAGS.seq + ' 2']))
     elif FLAGS.mode == 'thresholds':
-        c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
+        c = classifier.Classifier(
+            FLAGS.classifier_dir,
+            FLAGS.model,
+            forced_instance=FLAGS.instance,
+        )
         print(c.refresh_thresholds(FLAGS.limit, FLAGS.subset_file))
     elif FLAGS.mode == 'predict':
-        c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
+        c = classifier.Classifier(
+            FLAGS.classifier_dir,
+            FLAGS.model,
+            forced_instance=FLAGS.instance,
+        )
         c.refresh_predictions(FLAGS.limit)
     elif FLAGS.mode == 'csv':
-        c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
+        c = classifier.Classifier(
+            FLAGS.classifier_dir,
+            FLAGS.model,
+            forced_instance=FLAGS.instance,
+        )
         outputCsv(c)
     elif FLAGS.mode == 'prefetch':
         f = model_fetcher.Fetcher(FLAGS.fetch_config_path, FLAGS.model)
@@ -143,7 +157,7 @@ def main(_: Any) -> None:
         t.train(embedder=e,
                 vocab=c.vocab,
                 limit=FLAGS.limit,
-                forced_instance=FLAGS.train_instance,
+                forced_instance=FLAGS.instance,
                 train_ratio=FLAGS.train_ratio,
                 num_train_steps=FLAGS.train_steps)
     return
