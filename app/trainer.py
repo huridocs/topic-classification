@@ -10,12 +10,14 @@ import numpy as np
 import pandas as pd
 import tensorflow as tf
 from bert import optimization, tokenization
+from flask import Blueprint
 
+import app.tasks as tasks
 from app.classifier import Classifier
 from app.embedder import MAX_SEQ_LENGTH, Embedder
 from app.models import ClassificationSample, sessionLock
 
-# train_bp = Blueprint('train_bp', __name__)
+train_bp = Blueprint('train_bp', __name__)
 
 LEARNING_RATE = 2e-3
 WARMUP_PROPORTION = 0.0
@@ -340,3 +342,32 @@ class Trainer:
                                  subset_file=os.path.join(
                                      instance_path, 'test_seqs.csv')))
         return c
+
+
+class _TrainModel(tasks.TaskProvider):
+
+    def __init__(self, json: Any):
+        super().__init__(json)
+        self.base_classifier_dir = json['base_classifier_dir']
+        self.model = json['model']
+        self.vocab = json['vocab'] if 'vocab' in json else None
+        self.bert = json['bert'] if 'bert' in json else None
+        self.limit = json['limit'] if 'limit' in json else 2000
+
+    def Run(self, status_holder: tasks.StatusHolder) -> None:
+        status_holder.status = 'Training model ' + self.model
+        # Don't use the cache for long-running operations
+        if not self.bert or not self.vocab:
+            c = Classifier(self.base_classifier_dir, self.model)
+            if not self.bert:
+                self.bert = c.embedder.bert
+            if not self.vocab:
+                self.vocab = c.vocab
+
+        e = Embedder(self.bert)
+        t = Trainer(self.base_classifier_dir, self.model)
+        status_holder.status = str(
+            t.train(embedder=e, vocab=self.vocab, limit=self.limit))
+
+
+tasks.providers['TrainModel'] = _TrainModel

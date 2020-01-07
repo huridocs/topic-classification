@@ -29,7 +29,7 @@ flags.DEFINE_string(
 flags.DEFINE_integer('limit', 2000,
                      'Max number of classification samples to use')
 flags.DEFINE_integer('train_steps', 1000, 'Number of training iterations.')
-flags.DEFINE_float('train_ratio', 0.9, 'Train / eval split of labeled data.')
+flags.DEFINE_float('train_ratio', 0.7, 'Train / eval split of labeled data.')
 
 flags.DEFINE_boolean(
     'probs', False,
