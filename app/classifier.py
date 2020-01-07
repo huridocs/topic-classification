@@ -214,15 +214,15 @@ class Classifier:
                 'Failure to load thresholds file from %s with exception: %s' %
                 (path_to_thresholds, e))
 
-    def _classify_probs(self, seqs: List[str]) -> List[Dict[str, float]]:
+    def _classify_probs(self, seqs: List[str],
+                        batch_size: int = 1000) -> List[Dict[str, float]]:
         if len(seqs) == 0:
             return []
         # Split very large requests into chunks since
         # (intermediate) bert data is huge.
-        BATCH_SIZE = 200
-        if len(seqs) > BATCH_SIZE:
-            return (self._classify_probs(seqs[:BATCH_SIZE]) +
-                    self._classify_probs(seqs[BATCH_SIZE:]))
+        if len(seqs) > batch_size:
+            return (self._classify_probs(seqs[:batch_size]) +
+                    self._classify_probs(seqs[batch_size:]))
 
         embeddings = self.embedder.get_embedding(seqs)
         embedding_shape = embeddings[0].shape

@@ -2,7 +2,7 @@
 
 import csv
 import os
-from typing import Any, Dict, Iterator, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 from absl import app, flags
 
@@ -121,13 +121,6 @@ def importData(path: str, text_col: str, label_col: str,
                 existing.training_labels = training_labels
             existing.use_for_training = len(training_labels) > 0
         session.flush()
-
-
-def load_csv(path: str) -> Iterator[List[str]]:
-    with open(FLAGS.csv, 'r') as csvFile:
-        reader = csv.reader(csvFile, delimiter=',')
-        for row in reader:
-            yield row
 
 
 def main(_: Any) -> None:
