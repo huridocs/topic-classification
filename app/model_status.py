@@ -95,8 +95,6 @@ def getModels() -> Any:
         # TODO: don't refresh on every query
         quality_at_precision = status.classifier.refresh_thresholds()[PRECISION]
         for t, ti in status.classifier.topic_infos.items():
-            print(ti.recalls.__dir__())
-            print(ti.recalls.__class__)
             topics[t] = {
                 'name': t,
                 'samples': ti.num_samples,
