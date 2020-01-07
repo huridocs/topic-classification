@@ -249,9 +249,13 @@ class Trainer:
               embedder: Embedder,
               vocab: List[str],
               limit: int,
+              forced_instance: str = '',
+              train_ratio: float = 0.9,
               num_train_steps: int = 1000) -> Classifier:
         # timestamp = str(1578318208)
         timestamp = str(int(datetime.utcnow().timestamp()))
+        if forced_instance:
+            timestamp = forced_instance
         instance_path = os.path.join(self.model_config_path, timestamp)
         train_path = os.path.join(instance_path, 'train')
         if 'nan' not in vocab:
@@ -287,7 +291,7 @@ class Trainer:
                      vocab='label.vocab',
                      is_released=False,
                      description='From Trainer.train'), f)
-        train_values = data.sample(frac=0.9, random_state=42)
+        train_values = data.sample(frac=train_ratio, random_state=42)
         test_values = data.drop(train_values.index)
 
         with open(os.path.join(instance_path, 'test_seqs.csv'), 'w') as f:
@@ -301,11 +305,9 @@ class Trainer:
         train_examples = create_examples(train_values, num_classes, 'train')
         # eval_examples = create_examples(dev_values, num_classes, 'dev')
 
-        ITERATIONS_PER_LOOP = int(
-            min([num_train_steps,
-                 max([50, min([num_train_steps / 2, 500])])]))
-        run_config = tf.estimator.RunConfig(
-            model_dir=train_path, save_checkpoints_steps=ITERATIONS_PER_LOOP)
+        run_config = tf.estimator.RunConfig(model_dir=train_path,
+                                            save_checkpoints_steps=min(
+                                                [num_train_steps, 500]))
 
         model_fn = model_fn_builder(num_classes,
                                     learning_rate=LEARNING_RATE,
@@ -317,9 +319,8 @@ class Trainer:
         train_input_fn = input_fn_builder(train_examples, num_classes, embedder)
 
         saved_model_path = os.path.join(train_path, 'saved_models')
-        for i in range(0, num_train_steps, ITERATIONS_PER_LOOP):
-            estimator.train(input_fn=train_input_fn, steps=ITERATIONS_PER_LOOP)
-            save_model(saved_model_path, estimator)
+        estimator.train(input_fn=train_input_fn, steps=num_train_steps)
+        save_model(saved_model_path, estimator)
         print('***** Finished training at {} *****'.format(datetime.now()))
 
         copy_tree(

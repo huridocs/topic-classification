@@ -27,6 +27,11 @@ flags.DEFINE_string(
 flags.DEFINE_integer('limit', 2000,
                      'Max number of classification samples to use')
 flags.DEFINE_integer('train_steps', 1000, 'Number of training iterations.')
+flags.DEFINE_float('train_ratio', 0.9, 'Train / eval split of labeled data.')
+flags.DEFINE_string(
+    'train_instance', '',
+    'Force a given instance dir (e.g. to continue training). Example: "1578385362"'
+)
 
 flags.DEFINE_boolean(
     'probs', False,
@@ -138,6 +143,8 @@ def main(_: Any) -> None:
         t.train(embedder=e,
                 vocab=c.vocab,
                 limit=FLAGS.limit,
+                forced_instance=FLAGS.train_instance,
+                train_ratio=FLAGS.train_ratio,
                 num_train_steps=FLAGS.train_steps)
     return
 
