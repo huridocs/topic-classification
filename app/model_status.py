@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from flask import Blueprint
 from flask import current_app as app
@@ -92,17 +92,21 @@ def getModels() -> Any:
 
         bert = status.get_bert()
         topics = {}
-        quality_at_precision = status.classifier.refresh_thresholds()
+        # TODO: don't refresh on every query
+        quality_at_precision = status.classifier.refresh_thresholds()[PRECISION]
         for t, ti in status.classifier.topic_infos.items():
+            print(ti.recalls.__dir__())
+            print(ti.recalls.__class__)
             topics[t] = {
                 'name': t,
                 'samples': ti.num_samples,
-                'completeness': quality_at_precision[PRECISION]['completeness'],
-                'extraneous': quality_at_precision[PRECISION]['extra'],
+                'quality': ti.recalls.get(PRECISION, 0.0),
             }
         return jsonify(name=model,
                        instances=instances,
                        preferred=preferred,
+                       completeness=quality_at_precision['completeness'],
+                       extraneous=quality_at_precision['extra'],
                        bert=bert,
                        topics=topics)
 
