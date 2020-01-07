@@ -122,15 +122,17 @@ def getModels() -> Any:
             'preferred': preferred,
         }
         if preferred:
-            quality_at_precision = status.classifier.refresh_thresholds()
+            # TODO: don't refresh on every query
+            quality_at_precision = (
+                status.classifier.refresh_thresholds()[PRECISION])
             topics = {}
             for t, ti in status.classifier.topic_infos.items():
                 topics[t] = {
                     'name': t,
                     'samples': ti.num_samples,
                     'completeness':
-                        (quality_at_precision[PRECISION]['completeness']),
-                    'extraneous': quality_at_precision[PRECISION]['extra'],
+                        (quality_at_precision['completeness']),
+                    'extraneous': quality_at_precision['extra'],
                 }
 
             results[m]['topics'] = topics
