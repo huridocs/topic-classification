@@ -133,7 +133,7 @@ def main(_: Any) -> None:
         importPLANreview()
     elif FLAGS.mode == 'train':
         c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
-        e = embedder.Embedder(c.embedder.bert)
+        e = embedder.Embedder(FLAGS.bert)
         t = trainer.Trainer(FLAGS.classifier_dir, FLAGS.model)
         t.train(embedder=e,
                 vocab=c.vocab,
