@@ -6,7 +6,7 @@ from typing import Any, List, Tuple
 
 from absl import app, flags
 
-from app import classifier, embedder, model_fetcher
+from app import classifier, embedder, model_fetcher, trainer
 from app.models import ClassificationSample, hasher, session, sessionLock
 
 FLAGS = flags.FLAGS
@@ -26,6 +26,7 @@ flags.DEFINE_string(
     'saved models from and where to copy them to.')
 flags.DEFINE_integer('limit', 2000,
                      'Max number of classification samples to use')
+flags.DEFINE_integer('train_steps', 1000, 'Number of training iterations.')
 
 flags.DEFINE_boolean(
     'probs', False,
@@ -41,10 +42,10 @@ flags.DEFINE_string(
     'If set, perform threshold learning only on samples which have a sequence '
     'containing one of the sequences in this csv file.')
 
-flags.DEFINE_enum(
-    'mode', 'classify',
-    ['embed', 'classify', 'prefetch', 'thresholds', 'predict', 'csv', 'import'],
-    'The operation to perform.')
+flags.DEFINE_enum('mode', 'classify', [
+    'embed', 'classify', 'prefetch', 'thresholds', 'predict', 'csv', 'import',
+    'train'
+], 'The operation to perform.')
 
 
 def outputCsv(c: classifier.Classifier) -> None:
@@ -116,7 +117,7 @@ def main(_: Any) -> None:
             print(c.classify([FLAGS.seq, FLAGS.seq + ' 2']))
     elif FLAGS.mode == 'thresholds':
         c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
-        c.refresh_thresholds(FLAGS.limit, FLAGS.subset_file)
+        print(c.refresh_thresholds(FLAGS.limit, FLAGS.subset_file))
     elif FLAGS.mode == 'predict':
         c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
         c.refresh_predictions(FLAGS.limit)
@@ -130,6 +131,14 @@ def main(_: Any) -> None:
             print(l)
     elif FLAGS.mode == 'import_plan':
         importPLANreview()
+    elif FLAGS.mode == 'train':
+        c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
+        e = embedder.Embedder(c.embedder.bert)
+        t = trainer.Trainer(FLAGS.classifier_dir, FLAGS.model)
+        t.train(embedder=e,
+                vocab=c.vocab,
+                limit=FLAGS.limit,
+                num_train_steps=FLAGS.train_steps)
     return
 
 

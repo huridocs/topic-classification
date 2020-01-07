@@ -124,7 +124,10 @@ class Classifier:
                               (e.g. UPR_2percent_ps0).
     """
 
-    def __init__(self, base_classifier_dir: str, model_name: str):
+    def __init__(self,
+                 base_classifier_dir: str,
+                 model_name: str,
+                 forced_instance: str = ''):
         self.logger = logging.getLogger()
         self.lock = threading.Lock()
         if not os.path.isdir(base_classifier_dir):
@@ -132,6 +135,7 @@ class Classifier:
                             base_classifier_dir)
         self.model_name = model_name
         self.model_config_path = os.path.join(base_classifier_dir, model_name)
+        self.forced_instance = forced_instance
         self.topic_infos: Dict[str, TopicInfo] = {}
         self._load_instance_config()
 
@@ -141,10 +145,14 @@ class Classifier:
         instances = os.listdir(self.model_config_path)
         # pick the latest released instance
         for i in sorted(instances, reverse=True):
-            with open(os.path.join(self.model_config_path, i,
-                                   'config.json')) as f:
+            config_path = os.path.join(self.model_config_path, i, 'config.json')
+            if not os.path.exists(config_path):
+                continue
+            if self.forced_instance and self.forced_instance != i:
+                continue
+            with open(config_path) as f:
                 d = json.loads(f.read())
-                if d['is_released']:
+                if d['is_released'] or self.forced_instance == i:
                     self.instance = i
                     self.instance_config = InstanceConfig(d)
                     self.instance_dir = os.path.join(self.model_config_path,
@@ -327,7 +335,7 @@ class Classifier:
                     for row in csv.reader(subset_handle, delimiter=',')
                     if row
                 ]
-        print(subset_seqs[:10])
+        print('Subset example: ', subset_seqs[:1])
         with sessionLock:
             samples: List[ClassificationSample] = list(
                 ClassificationSample.query.find(
