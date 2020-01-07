@@ -31,3 +31,16 @@ To run operations from the command line, `./run local --help`.
 To run nose tests, `./run test`.
 
 To run pycodestyle, `./run lint`.
+
+## MyPy
+
+This package uses MyPy for Python type checking and intellisense.
+
+To install mypy in vscode, install the 'mypy' plugin and run these:
+
+```sh
+sudo apt install python3.8-venv python3.8-dev
+python3.8 -m venv ~/.mypyls
+~/.mypyls/bin/pip install -U wheel
+~/.mypyls/bin/pip install -U "https://github.com/matangover/mypyls/archive/master.zip#egg=mypyls[patched-mypy]"
+```
