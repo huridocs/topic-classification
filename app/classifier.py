@@ -337,8 +337,7 @@ class Classifier:
 
     def refresh_thresholds(self,
                            limit: int = 2000,
-                           subset_file: Optional[str] = None
-                           ) -> None:
+                           subset_file: Optional[str] = None) -> None:
         subset_seqs: List[str] = []
         if subset_file:
             with open(subset_file, 'r') as subset_handle:
@@ -406,11 +405,10 @@ class Classifier:
         path_to_quality = os.path.join(self.instance_dir, 'quality.json')
         with open(path_to_quality, 'w') as f:
             f.write(
-                json.dumps(
-                    {t: v
-                     for t, v in self.precision_quality.items()},
-                    indent=4,
-                    sort_keys=True))
+                json.dumps({t: v
+                            for t, v in self.precision_quality.items()},
+                           indent=4,
+                           sort_keys=True))
 
     @staticmethod
     def quality_to_predicted_labels(sample_probs: Dict[str, float]
