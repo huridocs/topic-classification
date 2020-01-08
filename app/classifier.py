@@ -1,9 +1,9 @@
-import collections
 import csv
 import json
 import logging
 import os
 import threading
+from collections import Counter
 from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
@@ -313,10 +313,10 @@ class Classifier:
     def _quality_at_precision(
             self, precision: int, sample_quality: List[Dict[str, float]],
             train_labels: List[Set[str]]
-    ) -> Tuple[int, float, float, collections.Counter]:
+    ) -> Tuple[int, float, float, Counter]:
         num_complete = 0.0
         sum_extra = 0.0
-        missing_topics: collections.Counter = collections.Counter()
+        missing_topics: Counter = Counter()
         for i, sample_trains in enumerate(train_labels):
             num_found = 0
             for train_topic in sample_trains:
