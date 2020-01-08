@@ -119,6 +119,7 @@ def importData(path: str, text_col: str, label_col: str,
                                                 sharedId=sharedId)
             else:
                 existing.training_labels = training_labels
+                existing.sharedId = sharedId
             existing.use_for_training = len(training_labels) > 0
         session.flush()
 
