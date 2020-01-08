@@ -60,18 +60,6 @@ class ModelStatus:
                              self.classifier.instance_config.subset)
                 if self.model_name else '')
 
-    def get_num_training_samples(self, topic: str) -> int:
-        # TODO: make this real
-        return 1000
-
-    def get_completeness_score(self, topic: str) -> float:
-        # TODO: make this real
-        return 0.99
-
-    def get_extraneous_wrong_values(self, topic: str) -> float:
-        # TODO: make this real
-        return 1
-
 
 @model_status_bp.route('/models', methods=['GET'])
 def getModels() -> Any:
