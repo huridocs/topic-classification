@@ -133,6 +133,7 @@ class Classifier:
         self.model_name = model_name
         self.model_config_path = os.path.join(base_classifier_dir, model_name)
         self.topic_infos: Dict[str, TopicInfo] = {}
+        self.quality_infos: Dict[str, Dict[str, Any]] = {}
         self._load_instance_config()
 
     def _load_instance_config(self) -> None:
@@ -151,6 +152,7 @@ class Classifier:
                                                      self.instance)
                     self._init_vocab()
                     self._init_thresholds()
+                    self._init_quality()
                     self._init_embedding()
                     self._init_predictor()
                     return
@@ -213,6 +215,24 @@ class Classifier:
             raise Exception(
                 'Failure to load thresholds file from %s with exception: %s' %
                 (path_to_thresholds, e))
+
+    def _init_quality(self) -> None:
+        path_to_quality = os.path.join(self.instance_dir, 'quality.json')
+        try:
+            if not os.path.exists(path_to_quality):
+                self.logger.warning(
+                    ('The model at %s does not have quality, ' +
+                     'consider ./run local --mode thresholds --model %s') %
+                    (self.instance_dir, self.model_name))
+            else:
+                with open(path_to_quality, 'r') as f:
+                    for k, v in json.load(f).items():
+                        self.quality_infos[k] = v
+            print('quality_infos' + self.quality_infos.__str__())
+        except Exception as e:
+            raise Exception(
+                'Failure to load quality file from %s with exception: %s' %
+                (path_to_quality, e))
 
     def _classify_probs(self, seqs: List[str]) -> List[Dict[str, float]]:
         if len(seqs) == 0:
@@ -318,7 +338,7 @@ class Classifier:
     def refresh_thresholds(self,
                            limit: int = 2000,
                            subset_file: Optional[str] = None
-                           ) -> Dict[int, Dict[str, Any]]:
+                           ) -> None:
         subset_seqs: List[str] = []
         if subset_file:
             with open(subset_file, 'r') as subset_handle:
@@ -327,7 +347,6 @@ class Classifier:
                     for row in csv.reader(subset_handle, delimiter=',')
                     if row
                 ]
-        print(subset_seqs[:10])
         with sessionLock:
             samples: List[ClassificationSample] = list(
                 ClassificationSample.query.find(
@@ -355,11 +374,11 @@ class Classifier:
 
         sample_quality = self._props_to_quality(sample_probs)
 
-        precision_quality: Dict[int, Dict[str, Any]] = {}
+        self.precision_quality: Dict[int, Dict[str, Any]] = {}
         for precision in [30, 40, 50, 60, 70, 80, 90]:
             _, completeness, extra, missing_topics = self._quality_at_precision(
                 precision, sample_quality, train_labels)
-            precision_quality[precision] = {
+            self.precision_quality[precision] = {
                 'completeness': completeness,
                 'extra': extra,
                 'missing': missing_topics
@@ -383,7 +402,15 @@ class Classifier:
                      for t, v in self.topic_infos.items()},
                     indent=4,
                     sort_keys=True))
-        return precision_quality
+
+        path_to_quality = os.path.join(self.instance_dir, 'quality.json')
+        with open(path_to_quality, 'w') as f:
+            f.write(
+                json.dumps(
+                    {t: v
+                     for t, v in self.precision_quality.items()},
+                    indent=4,
+                    sort_keys=True))
 
     @staticmethod
     def quality_to_predicted_labels(sample_probs: Dict[str, float]

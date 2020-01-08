@@ -58,7 +58,8 @@ class ModelStatus:
     def get_subset_file(self) -> str:
         return (os.path.join(self.classifier.instance_dir,
                              self.classifier.instance_config.subset)
-                if self.model_name else '')
+                if self.model_name and self.classifier.instance_config.subset
+                else '')
 
 
 @model_status_bp.route('/models', methods=['GET'])
@@ -84,17 +85,15 @@ def getModels() -> Any:
         preferred = status.get_preferred_model_instance()
 
         bert = status.get_bert()
-        subset = status.get_subset_file()
         topics = {}
-        # TODO: don't refresh on every query
-        quality_at_precision = (
-            status.classifier.refresh_thresholds(subset_file=subset)[PRECISION])
         for t, ti in status.classifier.topic_infos.items():
             topics[t] = {
                 'name': t,
                 'samples': ti.num_samples,
                 'quality': ti.recalls.get(PRECISION, 0.0),
             }
+        quality_at_precision = status.classifier.quality_infos.get(
+            str(PRECISION), {})
         return jsonify(name=model,
                        instances=instances,
                        preferred=preferred,
@@ -113,20 +112,18 @@ def getModels() -> Any:
             'name': m,
             'instances': instances,
             'preferred': preferred,
+            'completeness': quality_at_precision['completeness'],
+            'extraneous': quality_at_precision['extra'],
         }
         if preferred:
-            # TODO: don't refresh on every query
-            quality_at_precision = (
-                status.classifier.refresh_thresholds(
-                    subset_file=subset)[PRECISION])
+            quality_at_precision = status.classifier.quality_infos.get(
+                str(PRECISION), {})
             topics = {}
             for t, ti in status.classifier.topic_infos.items():
                 topics[t] = {
                     'name': t,
                     'samples': ti.num_samples,
-                    'completeness':
-                        (quality_at_precision['completeness']),
-                    'extraneous': quality_at_precision['extra'],
+                    'quality': ti.recalls.get(PRECISION, 0.0),
                 }
 
             results[m]['topics'] = topics
