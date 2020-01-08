@@ -9,6 +9,7 @@ from typing import Any, Dict, List, cast
 #         └── UPR_2percent_ps0
 #             └── saved_model
 #                 ├── label.vocab
+#                 ├── training_subset.csv
 #                 └── 1573031002
 #                     ├── saved_model.pb
 #                     └── variables
@@ -49,6 +50,10 @@ class InstanceConfig(ModelConfig):
     @property
     def vocab(self) -> str:
         return cast(str, self.get_property('vocab'))
+
+    @property
+    def subset(self) -> str:
+        return cast(str, self.get_property('training_subset_path'))
 
     @property
     def is_released(self) -> bool:

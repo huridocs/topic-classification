@@ -1,6 +1,6 @@
 import logging
 import os
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
 from flask import Blueprint
 from flask import current_app as app
@@ -55,6 +55,11 @@ class ModelStatus:
     def get_bert(self) -> str:
         return self.classifier.instance_config.bert if self.model_name else ''
 
+    def get_subset_file(self) -> str:
+        return (os.path.join(self.classifier.instance_dir,
+                             self.classifier.instance_config.subset)
+                if self.model_name else '')
+
     def get_num_training_samples(self, topic: str) -> int:
         # TODO: make this real
         return 1000
@@ -91,9 +96,11 @@ def getModels() -> Any:
         preferred = status.get_preferred_model_instance()
 
         bert = status.get_bert()
+        subset = status.get_subset_file()
         topics = {}
         # TODO: don't refresh on every query
-        quality_at_precision = status.classifier.refresh_thresholds()[PRECISION]
+        quality_at_precision = (
+            status.classifier.refresh_thresholds(subset_file=subset)[PRECISION])
         for t, ti in status.classifier.topic_infos.items():
             topics[t] = {
                 'name': t,
@@ -122,7 +129,8 @@ def getModels() -> Any:
         if preferred:
             # TODO: don't refresh on every query
             quality_at_precision = (
-                status.classifier.refresh_thresholds()[PRECISION])
+                status.classifier.refresh_thresholds(
+                    subset_file=subset)[PRECISION])
             topics = {}
             for t, ti in status.classifier.topic_infos.items():
                 topics[t] = {
