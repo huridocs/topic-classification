@@ -2,7 +2,7 @@
 
 import csv
 import os
-from typing import Any, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 from absl import app, flags
 
@@ -46,6 +46,20 @@ flags.DEFINE_enum(
     ['embed', 'classify', 'prefetch', 'thresholds', 'predict', 'csv', 'import'],
     'The operation to perform.')
 
+flags.DEFINE_string(
+    'csv', '',
+    'If a path to a csv file is given, its data will be loaded, classified '
+    'and the results are written to a new csv file')
+
+flags.DEFINE_string('text_col', 'text',
+                    'column name of the text data in a csv file')
+
+flags.DEFINE_string('label_col', '',
+                    'column name of the label data in a csv file')
+
+flags.DEFINE_string('sharedId_col', '',
+                    'column name of the sharedId in the csv file')
+
 
 def outputCsv(c: classifier.Classifier) -> None:
     filename = '/tmp/%s_%d%s.csv' % (FLAGS.model, FLAGS.limit,
@@ -53,8 +67,8 @@ def outputCsv(c: classifier.Classifier) -> None:
     with open(filename, 'w') as csvFile:
         writer = csv.writer(csvFile)
         writer.writerow([
-            'sequence', 'training_labels', 'predicted_sure', 'predicted_unsure',
-            'revised_training_labels'
+            'sharedId', 'sequence', 'training_labels', 'predicted_sure',
+            'predicted_unsure', 'revised_training_labels'
         ])
         with sessionLock:
             samples: List[ClassificationSample] = list(
@@ -72,33 +86,41 @@ def outputCsv(c: classifier.Classifier) -> None:
             pred_unsure_str = ';'.join(
                 [t for t, q in sorted_pred if q < FLAGS.csv_sure])
             if not FLAGS.csv_diff_only or train_str != pred_sure_str:
-                writer.writerow(
-                    [sample.seq, train_str, pred_sure_str, pred_unsure_str, ''])
+                writer.writerow([
+                    sample.sharedId, sample.seq, train_str, pred_sure_str,
+                    pred_unsure_str, ''
+                ])
     print('Wrote %s.' % filename)
 
 
-def importPLANreview() -> None:
-    with open(
-            'classifier_models/planinternational-themes/'
-            '1575552939/PLAN_review.csv', 'r') as csvFile, sessionLock:
+def importData(path: str, text_col: str, label_col: str,
+               sharedId_col: str) -> None:
+    with open(path, 'r') as csvFile, sessionLock:
         for row in csv.DictReader(csvFile):
-            seq = row['text']
+            seq = row[text_col]
             seqHash = hasher(seq)
-            training_labels: List[str] = eval(row['true_label'])
+
+            training_labels: List[Dict[str, float]] = []
+            if label_col != '':
+                training_label_list = eval(row[label_col])
+                training_labels = [dict(topic=l) for l in training_label_list]
+
+            sharedId = ''
+            if sharedId_col != '':
+                sharedId = row[sharedId_col]
+
             existing: ClassificationSample = ClassificationSample.query.get(
                 model=FLAGS.model, seqHash=seqHash)
             if not existing:
                 existing = ClassificationSample(model=FLAGS.model,
                                                 seq=seq,
-                                                seqHash=seqHash)
-            if existing.training_labels:
-                print('training label change', existing.training_labels,
-                      training_labels)
+                                                seqHash=seqHash,
+                                                training_labels=training_labels,
+                                                sharedId=sharedId)
             else:
-                existing.training_labels = [
-                    dict(topic=l) for l in training_labels
-                ]
-                existing.use_for_training = len(training_labels) > 0
+                existing.training_labels = training_labels
+                existing.sharedId = sharedId
+            existing.use_for_training = len(training_labels) > 0
         session.flush()
 
 
@@ -111,9 +133,9 @@ def main(_: Any) -> None:
     elif FLAGS.mode == 'classify':
         c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
         if FLAGS.probs:
-            print(c._classify_probs([FLAGS.seq, FLAGS.seq + ' 2']))
+            print(c._classify_probs([FLAGS.seq]))
         else:
-            print(c.classify([FLAGS.seq, FLAGS.seq + ' 2']))
+            print(c.classify([FLAGS.seq]))
     elif FLAGS.mode == 'thresholds':
         c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
         c.refresh_thresholds(FLAGS.limit, FLAGS.subset_file)
@@ -128,8 +150,9 @@ def main(_: Any) -> None:
         dst = f.fetchAll()
         for l in dst:
             print(l)
-    elif FLAGS.mode == 'import_plan':
-        importPLANreview()
+    elif FLAGS.mode == 'import':
+        importData(FLAGS.csv, FLAGS.text_col, FLAGS.label_col,
+                   FLAGS.sharedId_col)
     return
 
 

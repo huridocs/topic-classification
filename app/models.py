@@ -78,6 +78,7 @@ class ClassificationSample(MappedClass, JsonOdmHelper):
     _id = FieldProperty(schema.ObjectId)
     model = FieldProperty(schema.String)
     seq = FieldProperty(schema.String)
+    sharedId = FieldProperty(schema.String)
     seqHash = FieldProperty(schema.String)
     training_labels = FieldProperty(
         schema.Array(schema.Object(fields={'topic': schema.String})))

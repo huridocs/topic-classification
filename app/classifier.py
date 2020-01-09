@@ -233,14 +233,15 @@ class Classifier:
                 'Failure to load quality file from %s with exception: %s' %
                 (path_to_quality, e))
 
-    def _classify_probs(self, seqs: List[str]) -> List[Dict[str, float]]:
+    def _classify_probs(self, seqs: List[str],
+                        batch_size: int = 1000) -> List[Dict[str, float]]:
         if len(seqs) == 0:
             return []
         # Split very large requests into chunks since
         # (intermediate) bert data is huge.
-        if len(seqs) > 1000:
-            return (self._classify_probs(seqs[:1000]) +
-                    self._classify_probs(seqs[1000:]))
+        if len(seqs) > batch_size:
+            return (self._classify_probs(seqs[:batch_size]) +
+                    self._classify_probs(seqs[batch_size:]))
 
         embeddings = self.embedder.get_embedding(seqs)
         embedding_shape = embeddings[0].shape
@@ -309,10 +310,10 @@ class Classifier:
                 false_probs.append(sample_prob)
         return ComputeThresholds(topic, train_probs, false_probs)
 
-    def _quality_at_precision(
-            self, precision: int, sample_quality: List[Dict[str, float]],
-            train_labels: List[Set[str]]
-    ) -> Tuple[int, float, float, Counter]:
+    def _quality_at_precision(self, precision: int,
+                              sample_quality: List[Dict[str, float]],
+                              train_labels: List[Set[str]]
+                              ) -> Tuple[int, float, float, Counter]:
         num_complete = 0.0
         sum_extra = 0.0
         missing_topics: Counter = Counter()
