@@ -8,8 +8,6 @@ from flask import jsonify, request
 
 from app.classifier import Classifier, TopicInfo
 
-PRECISION = 30
-
 model_status_bp = Blueprint('model_status_bp', __name__)
 
 
@@ -77,13 +75,17 @@ class ModelStatus:
             }
         preferred = self.get_preferred_model_instance()
         quality_at_precision = self.classifier.quality_infos.get(
-            str(PRECISION), {})
+            app.config['DESIRED_CLASSIFIER_PRECISION'], {})
         topics = {}
         for t, ti in self.classifier.topic_infos.items():
             topics[t] = {
-                'name': t,
-                'samples': ti.num_samples,
-                'quality': ti.recalls.get(PRECISION, 0.0),
+                'name':
+                    t,
+                'samples':
+                    ti.num_samples,
+                'quality':
+                    ti.recalls.get(app.config['DESIRED_CLASSIFIER_PRECISION'],
+                                   0.0),
             }
         return {
             'name': self.model_name,
