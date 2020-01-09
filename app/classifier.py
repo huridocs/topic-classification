@@ -318,10 +318,10 @@ class Classifier:
                 false_probs.append(sample_prob)
         return ComputeThresholds(topic, train_probs, false_probs)
 
-    def _quality_at_precision(
-            self, precision: int, sample_quality: List[Dict[str, float]],
-            train_labels: List[Set[str]]
-    ) -> Tuple[int, float, float, Counter]:
+    def _quality_at_precision(self, precision: int,
+                              sample_quality: List[Dict[str, float]],
+                              train_labels: List[Set[str]]
+                              ) -> Tuple[int, float, float, Counter]:
         num_complete = 0.0
         sum_extra = 0.0
         missing_topics: Counter = Counter()
@@ -370,6 +370,10 @@ class Classifier:
             train_labels: List[Set[str]] = [
                 set([l.topic for l in s.training_labels]) for s in samples
             ]
+        if len(seqs) < 10:
+            raise RuntimeError(
+                'Cannot refresh thresholds since there are no training samples!'
+            )
         sample_probs = self._classify_probs(seqs)
 
         # TODO(bdittes): Enable multiprocessing.
@@ -391,16 +395,8 @@ class Classifier:
                 'extra': extra,
                 'missing': missing_topics
             }
-
-            # print(('%02.0f%% precision -> %02.0f%% complete, ' +
-            #        '+%01.1f extra wrong labels') %
-            #       (precision, completeness, extra))
-            # # precision,
-            # # dict(perc_complete=num_complete / len(train_labels),
-            # #      avg_extra=sum_extra / len(train_labels)))
-            # print(' ', [(k, '%2.0f%%' % (float(v) / len(train_labels) * 100))
-            #             for (k, v) in missing_topics.most_common(10)])
-            # print()
+            self.logger.info(
+                '%d: %s' % (precision, str(self.precision_quality[precision])))
 
         path_to_thresholds = os.path.join(self.instance_dir, 'thresholds.json')
         with open(path_to_thresholds, 'w') as f:

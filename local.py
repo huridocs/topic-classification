@@ -128,7 +128,7 @@ def main(_: Any) -> None:
             FLAGS.model,
             forced_instance=FLAGS.instance,
         )
-        print(c.refresh_thresholds(FLAGS.limit, FLAGS.subset_file))
+        c.refresh_thresholds(FLAGS.limit, FLAGS.subset_file)
     elif FLAGS.mode == 'predict':
         c = classifier.Classifier(
             FLAGS.classifier_dir,

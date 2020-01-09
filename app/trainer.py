@@ -9,8 +9,9 @@ from typing import Any, List
 import numpy as np
 import pandas as pd
 import tensorflow as tf
-from bert import optimization, tokenization
+from bert import tokenization
 from flask import Blueprint
+from models import class_based_attention
 
 import app.tasks as tasks
 from app.classifier import Classifier
@@ -19,10 +20,13 @@ from app.models import ClassificationSample, sessionLock
 
 train_bp = Blueprint('train_bp', __name__)
 
-LEARNING_RATE = 2e-3
+# LEARNING_RATE = 2e-3
+LEARNING_RATE = 0.02
+NUM_WARMUP_STEPS = 100
 WARMUP_PROPORTION = 0.0
 DROPOUT = 0.1
-SHARED_SIZE = 512
+# SHARED_SIZE = 512
+SHARED_SIZE = 0
 BATCH_SIZE = 256
 
 
@@ -155,87 +159,6 @@ def save_model(output_dir: str, estimator: tf.estimator.Estimator) -> None:
     estimator.export_saved_model(output_dir, serving_input_receiver_fn)
 
 
-def model_fn_builder(num_classes: int, learning_rate: float,
-                     num_train_steps: int) -> Any:
-    """Returns `model_fn` closure for Estimator."""
-
-    # Compute number of train and warmup steps
-    num_warmup_steps = int(num_train_steps * WARMUP_PROPORTION)
-
-    def model_fn(features: Any, labels: Any, mode: Any, params: Any) -> Any:
-        """The `model_fn` for Estimator."""
-
-        tags = set()
-        if mode == tf.estimator.ModeKeys.TRAIN:
-            tags.add('train')
-
-        input_mask = features['input_mask']
-        # batch_size = input_mask.shape[0]
-        if labels is not None:
-            label_ids = tf.cast(labels['label_ids'], tf.float32)
-
-        sequence_output = features['embeddings']
-
-        hidden_size = sequence_output.shape[-1].value
-        shared_query_embedding = tf.get_variable(
-            'shared_query', [1, 1, SHARED_SIZE],
-            initializer=tf.truncated_normal_initializer(stddev=0.02))
-        shared_query_embedding = tf.broadcast_to(shared_query_embedding,
-                                                 [1, num_classes, SHARED_SIZE])
-        class_query_embedding = tf.get_variable(
-            'class_query', [1, num_classes, hidden_size - SHARED_SIZE],
-            initializer=tf.truncated_normal_initializer(stddev=0.02))
-        query_embedding = tf.concat(
-            [shared_query_embedding, class_query_embedding], axis=2)
-        # pooled_output has shape [bs, num_classes, hidden_size]
-        # pooled_output = tf.keras.layers.Attention()(
-        #     [query_embedding, sequence_output],
-        #     [tf.ones([batch_size, num_classes], tf.bool),
-        #       tf.cast(input_mask, tf.bool)])
-        # Reimplement Attention layer to peek into weights.
-        scores = tf.matmul(query_embedding, sequence_output, transpose_b=True)
-        input_bias = tf.abs(input_mask - 1)
-        scores -= 1.e9 * tf.expand_dims(tf.cast(input_bias, tf.float32), axis=1)
-        distribution = tf.nn.softmax(scores)
-        pooled_output = tf.matmul(distribution, sequence_output)
-
-        if mode == tf.estimator.ModeKeys.TRAIN:
-            pooled_output = tf.nn.dropout(pooled_output, rate=DROPOUT)
-
-        logits = tf.layers.dense(pooled_output, num_classes)
-        logits = tf.matrix_diag_part(logits)
-
-        # probabilities = tf.nn.softmax(logits, axis=-1)  # single-label case
-        probabilities = tf.nn.sigmoid(logits)  # multi-label case
-
-        train_op, loss, predictions = None, None, None
-        # eval_metrics = None
-
-        if mode != tf.estimator.ModeKeys.PREDICT:
-            with tf.variable_scope('loss'):
-                per_example_loss = tf.nn.sigmoid_cross_entropy_with_logits(
-                    labels=label_ids, logits=logits)
-                loss = tf.reduce_mean(per_example_loss)
-
-        if mode == tf.estimator.ModeKeys.TRAIN:
-            train_op = optimization.create_optimizer(loss,
-                                                     learning_rate,
-                                                     num_train_steps,
-                                                     num_warmup_steps,
-                                                     use_tpu=False)
-        else:
-            predictions = dict(probabilities=probabilities,
-                               attention=distribution,
-                               pooled_output=pooled_output)
-
-        return tf.estimator.EstimatorSpec(mode=mode,
-                                          loss=loss,
-                                          train_op=train_op,
-                                          predictions=predictions)
-
-    return model_fn
-
-
 class Trainer:
 
     def __init__(self, base_classifier_dir: str, model_name: str) -> None:
@@ -307,15 +230,23 @@ class Trainer:
         train_examples = create_examples(train_values, num_classes, 'train')
         # eval_examples = create_examples(dev_values, num_classes, 'dev')
 
+        params = dict(num_classes=num_classes,
+                      learning_rate=LEARNING_RATE,
+                      num_warmup_steps=NUM_WARMUP_STEPS,
+                      dropout=DROPOUT,
+                      class_based_attention=True,
+                      shared_size=SHARED_SIZE,
+                      num_train_steps=num_train_steps)
+
         run_config = tf.estimator.RunConfig(model_dir=train_path,
                                             save_checkpoints_steps=min(
                                                 [num_train_steps, 500]))
 
-        model_fn = model_fn_builder(num_classes,
-                                    learning_rate=LEARNING_RATE,
-                                    num_train_steps=num_train_steps)
+        model_fn = class_based_attention.model_fn_builder(use_tpu=False)
 
-        estimator = tf.estimator.Estimator(model_fn=model_fn, config=run_config)
+        estimator = tf.estimator.Estimator(model_fn=model_fn,
+                                           config=run_config,
+                                           params=params)
 
         print('***** Started training at {} *****'.format(datetime.now()))
         train_input_fn = input_fn_builder(train_examples,
@@ -337,10 +268,9 @@ class Trainer:
         c = Classifier(self.base_classifier_dir,
                        self.model_name,
                        forced_instance=timestamp)
-        print(
-            c.refresh_thresholds(limit,
-                                 subset_file=os.path.join(
-                                     instance_path, 'test_seqs.csv')))
+        c.refresh_thresholds(limit,
+                             subset_file=os.path.join(instance_path,
+                                                      'test_seqs.csv'))
         return c
 
 
