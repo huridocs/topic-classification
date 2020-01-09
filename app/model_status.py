@@ -40,13 +40,13 @@ class ModelStatus:
     def list_potential_models(self) -> List[str]:
         return sorted(os.listdir(self.base_classifier_dir))
 
-    def list_model_instances(self, model_name: str) -> List[str]:
+    def list_model_instances(self) -> List[str]:
         try:
-            model_dir = os.path.join(self.base_classifier_dir, model_name)
+            model_dir = os.path.join(self.base_classifier_dir, self.model_name)
             return sorted(os.listdir(model_dir))
         except Exception:
             self.logger.info('No model %s found in classifier directory=%s' %
-                             (model_name, self.base_classifier_dir))
+                             (self.model_name, self.base_classifier_dir))
             return []
 
     def get_preferred_model_instance(self) -> str:
@@ -61,6 +61,34 @@ class ModelStatus:
                 if self.model_name and self.classifier.instance_config.subset
                 else '')
 
+    def _buildStatusDict(self) -> Dict[str, Any]:
+        bert = self.get_bert()
+        instances = self.list_model_instances()
+        if not instances:
+            return {
+                'name': self.model_name,
+                'error': 'Invalid model name %s' % self.model_name
+            }
+        preferred = self.get_preferred_model_instance()
+        quality_at_precision = self.classifier.quality_infos.get(
+            str(PRECISION), {})
+        topics = {}
+        for t, ti in self.classifier.topic_infos.items():
+            topics[t] = {
+                'name': t,
+                'samples': ti.num_samples,
+                'quality': ti.recalls.get(PRECISION, 0.0),
+            }
+        return {
+            'name': self.model_name,
+            'instances': instances,
+            'preferred': preferred,
+            'completeness': quality_at_precision.get('completeness', 0.0),
+            'extraneous': quality_at_precision.get('extra', 0.0),
+            'bert': bert,
+            'topics': topics
+        }
+
 
 @model_status_bp.route('/models', methods=['GET'])
 def getModels() -> Any:
@@ -69,64 +97,22 @@ def getModels() -> Any:
     # }
     args = request.args
 
-    status = ModelStatus(app.config['BASE_CLASSIFIER_DIR'])
-    models = status.list_potential_models()
     model = args.get('model', default='')
     verbose = args.get('verbose', default=True)
+
     if not verbose:
+        status = ModelStatus(app.config['BASE_CLASSIFIER_DIR'])
+        models = status.list_potential_models()
         return jsonify(models=models)
 
     if model:
         status = ModelStatus(app.config['BASE_CLASSIFIER_DIR'],
                              model_name=model)
-        instances = status.list_model_instances(model)
-        if not instances:
-            return jsonify(name=model, error='Invalid model name %s' % model)
-        preferred = status.get_preferred_model_instance()
+        return jsonify(status._buildStatusDict())
 
-        bert = status.get_bert()
-        topics = {}
-        for t, ti in status.classifier.topic_infos.items():
-            topics[t] = {
-                'name': t,
-                'samples': ti.num_samples,
-                'quality': ti.recalls.get(PRECISION, 0.0),
-            }
-        quality_at_precision = status.classifier.quality_infos.get(
-            str(PRECISION), {})
-        return jsonify(name=model,
-                       instances=instances,
-                       preferred=preferred,
-                       completeness=quality_at_precision.get(
-                           'completeness', 0.0),
-                       extraneous=quality_at_precision.get('extra', 0.0),
-                       bert=bert,
-                       topics=topics)
-
-    results: Dict[str, Any] = {}
     # TODO: Add typesjson to fix type problems in the results dict.
+    results: Dict[str, Any] = {}
     for m in models:
         status = ModelStatus(app.config['BASE_CLASSIFIER_DIR'], model_name=m)
-        instances = status.list_model_instances(m)
-        preferred = status.get_preferred_model_instance()
-        results[m] = {
-            'name': m,
-            'instances': instances,
-            'preferred': preferred,
-        }
-        if preferred:
-            quality_at_precision = status.classifier.quality_infos.get(
-                str(PRECISION), {})
-            results[m]['completeness'] = quality_at_precision.get(
-                'completeness', 0.0)
-            results[m]['extraneous'] = quality_at_precision.get('extra', 0.0),
-            topics = {}
-            for t, ti in status.classifier.topic_infos.items():
-                topics[t] = {
-                    'name': t,
-                    'samples': ti.num_samples,
-                    'quality': ti.recalls.get(PRECISION, 0.0),
-                }
-
-            results[m]['topics'] = topics
+        results[m] = status._buildStatusDict()
     return jsonify(results)
