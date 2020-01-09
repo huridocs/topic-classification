@@ -377,10 +377,14 @@ class Classifier:
         for precision in [30, 40, 50, 60, 70, 80, 90]:
             _, completeness, extra, missing_topics = self._quality_at_precision(
                 precision, sample_quality, train_labels)
+            top_missing_topics = {
+                k: (float(v) / len(train_labels) * 100)
+                for (k, v) in missing_topics.most_common(10)}
+            print(top_missing_topics)
             self.precision_quality[precision] = {
                 'completeness': completeness,
                 'extra': extra,
-                'missing': missing_topics
+                'missing': top_missing_topics
             }
 
             # print(('%02.0f%% precision -> %02.0f%% complete, ' +
