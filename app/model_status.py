@@ -67,12 +67,6 @@ class ModelStatus:
                 self.model_name)
         return ''
 
-    def get_subset_file(self) -> str:
-        return (os.path.join(self.classifier.instance_dir,
-                             self.classifier.instance_config.subset_file)
-                if self.model_name and
-                self.classifier.instance_config.subset_file else '')
-
     def _build_status_dict(self) -> Dict[str, Any]:
         bert = self.get_bert()
         instances = self.list_model_instances()
