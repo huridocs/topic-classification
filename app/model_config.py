@@ -9,7 +9,7 @@ from typing import Any, Dict, List, cast
 #         └── UPR_2percent_ps0
 #             └── saved_model
 #                 ├── label.vocab
-#                 ├── training_subset.csv
+#                 ├── subset.csv
 #                 └── 1573031002
 #                     ├── saved_model.pb
 #                     └── variables
