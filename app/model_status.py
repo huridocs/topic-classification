@@ -50,16 +50,28 @@ class ModelStatus:
             return []
 
     def get_preferred_model_instance(self) -> str:
-        return self.classifier.instance if self.model_name else ''
+        try:
+            return self.classifier.instance if self.model_name else ''
+        except Exception:
+            self.logger.info('No preferred instance found for model %s' %
+                             self.model_name)
+        return ''
 
     def get_bert(self) -> str:
-        return self.classifier.instance_config.bert if self.model_name else ''
+        try:
+            return self.classifier.instance_config.bert if (
+                self.model_name) else ''
+        except Exception:
+            self.logger.info(
+                'No preferred instance with BERT specified found for model %s' %
+                self.model_name)
+        return ''
 
     def get_subset_file(self) -> str:
         return (os.path.join(self.classifier.instance_dir,
-                             self.classifier.instance_config.subset)
-                if self.model_name and self.classifier.instance_config.subset
-                else '')
+                             self.classifier.instance_config.subset_file)
+                if self.model_name and
+                self.classifier.instance_config.subset_file else '')
 
     def _build_status_dict(self) -> Dict[str, Any]:
         bert = self.get_bert()
@@ -100,9 +112,9 @@ def getModels() -> Any:
     model = args.get('model', default='')
     verbose = args.get('verbose', default=True)
 
+    status = ModelStatus(app.config['BASE_CLASSIFIER_DIR'])
+    models = status.list_potential_models()
     if not verbose:
-        status = ModelStatus(app.config['BASE_CLASSIFIER_DIR'])
-        models = status.list_potential_models()
         return jsonify(models=models)
 
     if model:

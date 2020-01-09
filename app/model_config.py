@@ -52,8 +52,8 @@ class InstanceConfig(ModelConfig):
         return cast(str, self.get_property('vocab'))
 
     @property
-    def subset(self) -> str:
-        return cast(str, self.get_property('training_subset_path'))
+    def subset_file(self) -> str:
+        return cast(str, self.get_property('subset_file'))
 
     @property
     def is_released(self) -> bool:
