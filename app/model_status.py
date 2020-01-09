@@ -55,17 +55,11 @@ class ModelStatus:
     def get_bert(self) -> str:
         return self.classifier.instance_config.bert if self.model_name else ''
 
-    def get_num_training_samples(self, topic: str) -> int:
-        # TODO: make this real
-        return 1000
-
-    def get_completeness_score(self, topic: str) -> float:
-        # TODO: make this real
-        return 0.99
-
-    def get_extraneous_wrong_values(self, topic: str) -> float:
-        # TODO: make this real
-        return 1
+    def get_subset_file(self) -> str:
+        return (os.path.join(self.classifier.instance_dir,
+                             self.classifier.instance_config.subset)
+                if self.model_name and self.classifier.instance_config.subset
+                else '')
 
 
 @model_status_bp.route('/models', methods=['GET'])
@@ -92,17 +86,19 @@ def getModels() -> Any:
 
         bert = status.get_bert()
         topics = {}
-        quality_at_precision = status.classifier.refresh_thresholds()
         for t, ti in status.classifier.topic_infos.items():
             topics[t] = {
                 'name': t,
                 'samples': ti.num_samples,
-                'completeness': quality_at_precision[PRECISION]['completeness'],
-                'extraneous': quality_at_precision[PRECISION]['extra'],
+                'quality': ti.recalls.get(PRECISION, 0.0),
             }
+        quality_at_precision = status.classifier.quality_infos.get(
+            str(PRECISION), {})
         return jsonify(name=model,
                        instances=instances,
                        preferred=preferred,
+                       completeness=quality_at_precision['completeness'],
+                       extraneous=quality_at_precision['extra'],
                        bert=bert,
                        topics=topics)
 
@@ -116,17 +112,18 @@ def getModels() -> Any:
             'name': m,
             'instances': instances,
             'preferred': preferred,
+            'completeness': quality_at_precision['completeness'],
+            'extraneous': quality_at_precision['extra'],
         }
         if preferred:
-            quality_at_precision = status.classifier.refresh_thresholds()
+            quality_at_precision = status.classifier.quality_infos.get(
+                str(PRECISION), {})
             topics = {}
             for t, ti in status.classifier.topic_infos.items():
                 topics[t] = {
                     'name': t,
                     'samples': ti.num_samples,
-                    'completeness':
-                        (quality_at_precision[PRECISION]['completeness']),
-                    'extraneous': quality_at_precision[PRECISION]['extra'],
+                    'quality': ti.recalls.get(PRECISION, 0.0),
                 }
 
             results[m]['topics'] = topics
