@@ -541,6 +541,7 @@ def classify() -> Any:
 def add_samples() -> Any:
     # request.args: &model=upr-info_issues
     # request.get_json: {'samples': [{'seq': "hello world',
+    #                                 'sharedId': 'asda12',
     #                                 'training_labels'?: [
     #                                     {'topic':"Murder},
     #                                     {'topic': 'Justice'}]},
@@ -565,19 +566,23 @@ def add_samples() -> Any:
                 model=args['model'], seqHash=seqHash)
             sample_labels = (sample['training_labels']
                              if 'training_labels' in sample else [])
+            sharedId = (sample['sharedId'] if 'sharedId' in sample else '')
             if existing:
                 response_sample = existing
                 if 'training_labels' in sample:
                     existing.training_labels = sample_labels
                     existing.use_for_training = len(sample_labels) > 0
+                if 'sharedId' in sample:
+                    existing.sharedId = sharedId
             elif seqHash not in processed:
                 response_sample = ClassificationSample(
                     model=args['model'],
                     seq=sample['seq'],
                     seqHash=seqHash,
                     training_labels=sample_labels,
+                    sharedId=sharedId,
                     use_for_training=len(sample_labels) > 0)
-                session.flush()
+            session.flush()
         processed.add(seqHash)
         if response_sample:
             if not response_sample.predicted_labels:

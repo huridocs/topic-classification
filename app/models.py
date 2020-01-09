@@ -72,7 +72,7 @@ class ClassificationSample(MappedClass, JsonOdmHelper):
     class __mongometa__:
         session = session
         name = 'classification_sample'
-        indexes = [('model',)]
+        indexes = [('model',), ('sharedId',)]
         unique_indexes = [('model', 'seqHash')]
 
     _id = FieldProperty(schema.ObjectId)
