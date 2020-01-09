@@ -379,23 +379,14 @@ class Classifier:
                 precision, sample_quality, train_labels)
             top_missing_topics = {
                 k: (float(v) / len(train_labels) * 100)
-                for (k, v) in missing_topics.most_common(10)}
+                for (k, v) in missing_topics.most_common(10)
+            }
             print(top_missing_topics)
             self.precision_quality[precision] = {
                 'completeness': completeness,
                 'extra': extra,
                 'missing': top_missing_topics
             }
-
-            # print(('%02.0f%% precision -> %02.0f%% complete, ' +
-            #        '+%01.1f extra wrong labels') %
-            #       (precision, completeness, extra))
-            # # precision,
-            # # dict(perc_complete=num_complete / len(train_labels),
-            # #      avg_extra=sum_extra / len(train_labels)))
-            # print(' ', [(k, '%2.0f%%' % (float(v) / len(train_labels) * 100))
-            #             for (k, v) in missing_topics.most_common(10)])
-            # print()
 
         path_to_thresholds = os.path.join(self.instance_dir, 'thresholds.json')
         with open(path_to_thresholds, 'w') as f:
