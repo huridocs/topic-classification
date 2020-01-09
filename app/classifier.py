@@ -228,7 +228,6 @@ class Classifier:
                 with open(path_to_quality, 'r') as f:
                     for k, v in json.load(f).items():
                         self.quality_infos[k] = v
-            print('quality_infos' + self.quality_infos.__str__())
         except Exception as e:
             raise Exception(
                 'Failure to load quality file from %s with exception: %s' %
