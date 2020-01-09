@@ -1,0 +1,115 @@
+{
+    "30": {
+        "completeness": 96.74502712477397,
+        "extra": 0.15913200723327306,
+        "missing": {
+            "Economic Rights": 1,
+            "Equality & Inclusion": 2,
+            "Gender": 1,
+            "Governance & Rule of Law": 5,
+            "Harmful Practices": 1,
+            "Health": 1,
+            "Humanitarian": 1,
+            "Poverty": 1,
+            "Social & Cultural Rights": 4,
+            "Violence": 1
+        }
+    },
+    "40": {
+        "completeness": 96.74502712477397,
+        "extra": 0.15913200723327306,
+        "missing": {
+            "Economic Rights": 1,
+            "Equality & Inclusion": 2,
+            "Gender": 1,
+            "Governance & Rule of Law": 5,
+            "Harmful Practices": 1,
+            "Health": 1,
+            "Humanitarian": 1,
+            "Poverty": 1,
+            "Social & Cultural Rights": 4,
+            "Violence": 1
+        }
+    },
+    "50": {
+        "completeness": 96.74502712477397,
+        "extra": 0.15913200723327306,
+        "missing": {
+            "Economic Rights": 1,
+            "Equality & Inclusion": 2,
+            "Gender": 1,
+            "Governance & Rule of Law": 5,
+            "Harmful Practices": 1,
+            "Health": 1,
+            "Humanitarian": 1,
+            "Poverty": 1,
+            "Social & Cultural Rights": 4,
+            "Violence": 1
+        }
+    },
+    "60": {
+        "completeness": 96.74502712477397,
+        "extra": 0.15913200723327306,
+        "missing": {
+            "Economic Rights": 1,
+            "Equality & Inclusion": 2,
+            "Gender": 1,
+            "Governance & Rule of Law": 5,
+            "Harmful Practices": 1,
+            "Health": 1,
+            "Humanitarian": 1,
+            "Poverty": 1,
+            "Social & Cultural Rights": 4,
+            "Violence": 1
+        }
+    },
+    "70": {
+        "completeness": 96.74502712477397,
+        "extra": 0.15913200723327306,
+        "missing": {
+            "Economic Rights": 1,
+            "Equality & Inclusion": 2,
+            "Gender": 1,
+            "Governance & Rule of Law": 5,
+            "Harmful Practices": 1,
+            "Health": 1,
+            "Humanitarian": 1,
+            "Poverty": 1,
+            "Social & Cultural Rights": 4,
+            "Violence": 1
+        }
+    },
+    "80": {
+        "completeness": 96.74502712477397,
+        "extra": 0.1518987341772152,
+        "missing": {
+            "Economic Rights": 1,
+            "Equality & Inclusion": 2,
+            "Gender": 1,
+            "Governance & Rule of Law": 5,
+            "Harmful Practices": 1,
+            "Health": 1,
+            "Humanitarian": 1,
+            "Poverty": 1,
+            "Social & Cultural Rights": 4,
+            "Violence": 1
+        }
+    },
+    "90": {
+        "completeness": 90.23508137432188,
+        "extra": 0.11030741410488246,
+        "missing": {
+            "Economic Rights": 1,
+            "Equality & Inclusion": 2,
+            "Food & Nutrition": 33,
+            "Gender": 1,
+            "Governance & Rule of Law": 5,
+            "Harmful Practices": 1,
+            "Health": 1,
+            "Humanitarian": 1,
+            "Poverty": 1,
+            "Social & Cultural Rights": 4,
+            "Violence": 5
+        }
+    }
+}
