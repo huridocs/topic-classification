@@ -40,6 +40,35 @@ def test_classify(app: Flask, fs: FakeFilesystem) -> None:
     assert result[0]['Rights of the Child'] >= 0.7
 
 
+def test_all_model_status(app: Flask, fs: FakeFilesystem) -> None:
+    fs.add_real_directory('./testdata/test_model/test_instance')
+    fs.add_real_directory('./testdata/test_model/test_instance_unreleased')
+
+    client = app.test_client()
+
+    with app.test_request_context():
+        resp = client.get('/models', content_type='application/json')
+    assert resp.status == '200 OK'
+
+    result = json.loads(resp.data)
+    print(result)
+
+    assert result
+    assert result['instances'] == ['test_instance', 'test_instance_unreleased']
+    assert result['preferred'] == 'test_instance'
+    # Pick two random test topics to assert
+    assert result['topics']['Asylum-seekers - refugees'] == {
+        'name': 'Asylum-seekers - refugees',
+        'quality': 1.0,
+        'samples': 260
+    }
+    assert result['topics']['National Human Rights Institution'] == {
+        'name': 'National Human Rights Institution',
+        'quality': 1.0,
+        'samples': 552
+    }
+
+
 def test_model_status(app: Flask, fs: FakeFilesystem) -> None:
     fs.add_real_directory('./testdata/test_model/test_instance')
     fs.add_real_directory('./testdata/test_model/test_instance_unreleased')
@@ -50,7 +79,20 @@ def test_model_status(app: Flask, fs: FakeFilesystem) -> None:
         resp = client.get('/models?model=test_model',
                           content_type='application/json')
     assert resp.status == '200 OK'
+
     result = json.loads(resp.data)
+
     assert result
     assert result['instances'] == ['test_instance', 'test_instance_unreleased']
     assert result['preferred'] == 'test_instance'
+    # Pick two random test topics to assert
+    assert result['topics']['Asylum-seekers - refugees'] == {
+        'name': 'Asylum-seekers - refugees',
+        'quality': 1.0,
+        'samples': 260
+    }
+    assert result['topics']['National Human Rights Institution'] == {
+        'name': 'National Human Rights Institution',
+        'quality': 1.0,
+        'samples': 552
+    }

@@ -97,8 +97,9 @@ def getModels() -> Any:
         return jsonify(name=model,
                        instances=instances,
                        preferred=preferred,
-                       completeness=quality_at_precision['completeness'],
-                       extraneous=quality_at_precision['extra'],
+                       completeness=quality_at_precision.get(
+                           'completeness', 0.0),
+                       extraneous=quality_at_precision.get('extra', 0.0),
                        bert=bert,
                        topics=topics)
 
@@ -112,12 +113,13 @@ def getModels() -> Any:
             'name': m,
             'instances': instances,
             'preferred': preferred,
-            'completeness': quality_at_precision['completeness'],
-            'extraneous': quality_at_precision['extra'],
         }
         if preferred:
             quality_at_precision = status.classifier.quality_infos.get(
                 str(PRECISION), {})
+            results[m]['completeness'] = quality_at_precision.get(
+                'completeness', 0.0)
+            results[m]['extraneous'] = quality_at_precision.get('extra', 0.0),
             topics = {}
             for t, ti in status.classifier.topic_infos.items():
                 topics[t] = {
