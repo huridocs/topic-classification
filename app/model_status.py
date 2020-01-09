@@ -61,7 +61,7 @@ class ModelStatus:
                 if self.model_name and self.classifier.instance_config.subset
                 else '')
 
-    def _buildStatusDict(self) -> Dict[str, Any]:
+    def _build_status_dict(self) -> Dict[str, Any]:
         bert = self.get_bert()
         instances = self.list_model_instances()
         if not instances:
@@ -108,11 +108,11 @@ def getModels() -> Any:
     if model:
         status = ModelStatus(app.config['BASE_CLASSIFIER_DIR'],
                              model_name=model)
-        return jsonify(status._buildStatusDict())
+        return jsonify(status._build_status_dict())
 
     # TODO: Add typesjson to fix type problems in the results dict.
     results: Dict[str, Any] = {}
     for m in models:
         status = ModelStatus(app.config['BASE_CLASSIFIER_DIR'], model_name=m)
-        results[m] = status._buildStatusDict()
+        results[m] = status._build_status_dict()
     return jsonify(results)
