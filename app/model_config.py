@@ -9,7 +9,7 @@ from typing import Any, Dict, List, cast
 #         └── UPR_2percent_ps0
 #             └── saved_model
 #                 ├── label.vocab
-#                 ├── training_subset.csv
+#                 ├── subset.csv
 #                 └── 1573031002
 #                     ├── saved_model.pb
 #                     └── variables
@@ -52,8 +52,8 @@ class InstanceConfig(ModelConfig):
         return cast(str, self.get_property('vocab'))
 
     @property
-    def subset(self) -> str:
-        return cast(str, self.get_property('training_subset_path'))
+    def subset_file(self) -> str:
+        return cast(str, self.get_property('subset_file'))
 
     @property
     def is_released(self) -> bool:

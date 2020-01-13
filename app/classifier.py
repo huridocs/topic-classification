@@ -238,7 +238,6 @@ class Classifier:
                 with open(path_to_quality, 'r') as f:
                     for k, v in json.load(f).items():
                         self.quality_infos[k] = v
-            print('quality_infos' + self.quality_infos.__str__())
         except Exception as e:
             raise Exception(
                 'Failure to load quality file from %s with exception: %s' %
@@ -401,20 +400,6 @@ class Classifier:
             self.logger.info(str(ti))
             self.topic_infos[ti.topic] = ti
 
-        sample_quality = self._props_to_quality(sample_probs)
-
-        self.precision_quality: Dict[int, Dict[str, Any]] = {}
-        for precision in [30, 40, 50, 60, 70, 80, 90]:
-            _, completeness, extra, missing_topics = self._quality_at_precision(
-                precision, sample_quality, train_labels)
-            self.precision_quality[precision] = {
-                'completeness': completeness,
-                'extra': extra,
-                'missing': missing_topics
-            }
-            self.logger.info(
-                '%d: %s' % (precision, str(self.precision_quality[precision])))
-
         path_to_thresholds = os.path.join(self.instance_dir, 'thresholds.json')
         with open(path_to_thresholds, 'w') as f:
             f.write(
@@ -424,11 +409,29 @@ class Classifier:
                     indent=4,
                     sort_keys=True))
 
+        # Calculate and write out quality information at precision intervals
+        sample_quality = self._props_to_quality(sample_probs)
+        precision_quality: Dict[int, Dict[str, Any]] = {}
+        for precision in [30, 40, 50, 60, 70, 80, 90]:
+            _, completeness, extra, missing_topics = self._quality_at_precision(
+                precision, sample_quality, train_labels)
+            top_missing_topics = {
+                k: (float(v) / len(train_labels) * 100)
+                for (k, v) in missing_topics.most_common(10)
+            }
+            precision_quality[precision] = {
+                'completeness': completeness,
+                'extra': extra,
+                'missing': top_missing_topics
+            }
+            self.logger.info(
+                '%d: %s' % (precision, str(self.precision_quality[precision])))
+
         path_to_quality = os.path.join(self.instance_dir, 'quality.json')
         with open(path_to_quality, 'w') as f:
             f.write(
                 json.dumps({t: v
-                            for t, v in self.precision_quality.items()},
+                            for t, v in precision_quality.items()},
                            indent=4,
                            sort_keys=True))
 
