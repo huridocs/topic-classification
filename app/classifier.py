@@ -1,11 +1,11 @@
-import collections
 import csv
 import json
 import logging
 import os
 import threading
+from collections import Counter
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
 import tensorflow as tf
@@ -133,6 +133,7 @@ class Classifier:
         self.model_name = model_name
         self.model_config_path = os.path.join(base_classifier_dir, model_name)
         self.topic_infos: Dict[str, TopicInfo] = {}
+        self.quality_infos: Dict[str, Dict[str, Any]] = {}
         self._load_instance_config()
 
     def _load_instance_config(self) -> None:
@@ -151,6 +152,7 @@ class Classifier:
                                                      self.instance)
                     self._init_vocab()
                     self._init_thresholds()
+                    self._init_quality()
                     self._init_embedding()
                     self._init_predictor()
                     return
@@ -213,6 +215,23 @@ class Classifier:
             raise Exception(
                 'Failure to load thresholds file from %s with exception: %s' %
                 (path_to_thresholds, e))
+
+    def _init_quality(self) -> None:
+        path_to_quality = os.path.join(self.instance_dir, 'quality.json')
+        try:
+            if not os.path.exists(path_to_quality):
+                self.logger.warning(
+                    ('The model at %s does not have quality, ' +
+                     'consider ./run local --mode thresholds --model %s') %
+                    (self.instance_dir, self.model_name))
+            else:
+                with open(path_to_quality, 'r') as f:
+                    for k, v in json.load(f).items():
+                        self.quality_infos[k] = v
+        except Exception as e:
+            raise Exception(
+                'Failure to load quality file from %s with exception: %s' %
+                (path_to_quality, e))
 
     def _classify_probs(self, seqs: List[str],
                         batch_size: int = 1000) -> List[Dict[str, float]]:
@@ -291,6 +310,31 @@ class Classifier:
                 false_probs.append(sample_prob)
         return ComputeThresholds(topic, train_probs, false_probs)
 
+    def _quality_at_precision(self, precision: int,
+                              sample_quality: List[Dict[str, float]],
+                              train_labels: List[Set[str]]
+                              ) -> Tuple[int, float, float, Counter]:
+        num_complete = 0.0
+        sum_extra = 0.0
+        missing_topics: Counter = Counter()
+        for i, sample_trains in enumerate(train_labels):
+            num_found = 0
+            for train_topic in sample_trains:
+                sample_qual = sample_quality[i].get(train_topic, 0.0)
+                if sample_qual >= precision / 100.0:
+                    num_found += 1
+                else:
+                    missing_topics[train_topic] += 1
+            if num_found >= len(sample_trains):
+                num_complete += 1
+            sum_extra += len([
+                q for q in sample_quality[i].values() if q >= precision / 100.0
+            ]) - num_found
+
+        completeness = num_complete / len(train_labels) * 100
+        extra = sum_extra / len(train_labels)
+        return (precision, completeness, extra, missing_topics)
+
     def refresh_thresholds(self,
                            limit: int = 2000,
                            subset_file: Optional[str] = None) -> None:
@@ -302,7 +346,6 @@ class Classifier:
                     for row in csv.reader(subset_handle, delimiter=',')
                     if row
                 ]
-        print(subset_seqs[:10])
         with sessionLock:
             samples: List[ClassificationSample] = list(
                 ClassificationSample.query.find(
@@ -328,36 +371,6 @@ class Classifier:
             self.logger.info(str(ti))
             self.topic_infos[ti.topic] = ti
 
-        sample_quality = self._props_to_quality(sample_probs)
-        for precision in [30, 40, 50, 60, 70, 80, 90]:
-            num_complete = 0.0
-            sum_extra = 0.0
-            missing_topics: collections.Counter = collections.Counter()
-            for i, sample_trains in enumerate(train_labels):
-                num_found = 0
-                for train_topic in sample_trains:
-                    sample_qual = sample_quality[i].get(train_topic, 0.0)
-                    if sample_qual >= precision / 100.0:
-                        num_found += 1
-                    else:
-                        missing_topics[train_topic] += 1
-                if num_found >= len(sample_trains):
-                    num_complete += 1
-                sum_extra += len([
-                    q for q in sample_quality[i].values()
-                    if q >= precision / 100.0
-                ]) - num_found
-            print(('%02.0f%% precision -> %02.0f%% complete, ' +
-                   '+%01.1f extra wrong labels') %
-                  (precision, num_complete / len(train_labels) * 100,
-                   sum_extra / len(train_labels)))
-            # precision,
-            # dict(perc_complete=num_complete / len(train_labels),
-            #      avg_extra=sum_extra / len(train_labels)))
-            print(' ', [(k, '%2.0f%%' % (float(v) / len(train_labels) * 100))
-                        for (k, v) in missing_topics.most_common(10)])
-            print()
-
         path_to_thresholds = os.path.join(self.instance_dir, 'thresholds.json')
         with open(path_to_thresholds, 'w') as f:
             f.write(
@@ -366,6 +379,30 @@ class Classifier:
                      for t, v in self.topic_infos.items()},
                     indent=4,
                     sort_keys=True))
+
+        # Calculate and write out quality information at precision intervals
+        sample_quality = self._props_to_quality(sample_probs)
+        precision_quality: Dict[int, Dict[str, Any]] = {}
+        for precision in [30, 40, 50, 60, 70, 80, 90]:
+            _, completeness, extra, missing_topics = self._quality_at_precision(
+                precision, sample_quality, train_labels)
+            top_missing_topics = {
+                k: (float(v) / len(train_labels) * 100)
+                for (k, v) in missing_topics.most_common(10)
+            }
+            precision_quality[precision] = {
+                'completeness': completeness,
+                'extra': extra,
+                'missing': top_missing_topics
+            }
+
+        path_to_quality = os.path.join(self.instance_dir, 'quality.json')
+        with open(path_to_quality, 'w') as f:
+            f.write(
+                json.dumps({t: v
+                            for t, v in precision_quality.items()},
+                           indent=4,
+                           sort_keys=True))
 
     @staticmethod
     def quality_to_predicted_labels(sample_probs: Dict[str, float]

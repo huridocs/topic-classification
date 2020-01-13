@@ -1,41 +1,101 @@
-import json
 import logging
 import os
-from typing import Any, List
+from typing import Any, Dict, List
 
 from flask import Blueprint
 from flask import current_app as app
 from flask import jsonify, request
+
+from app.classifier import Classifier, TopicInfo
 
 model_status_bp = Blueprint('model_status_bp', __name__)
 
 
 class ModelStatus:
 
-    def __init__(self, base_classifier_dir: str) -> None:
+    class TopicStatus:
+
+        def __init__(self, topic_name: str, topic_infos: TopicInfo):
+            self.topic_name = topic_name
+            self.info = topic_infos
+
+    def __init__(self, base_classifier_dir: str, model_name: str = '') -> None:
         self.logger = logging.getLogger()
         self.base_classifier_dir = base_classifier_dir
+        self.model_name = model_name
+        if self.model_name:
+            try:
+                self.classifier = Classifier(self.base_classifier_dir,
+                                             model_name)
+                self.topic_infos: Dict[str, ModelStatus.TopicStatus] = {}
+                for t, ti in self.classifier.topic_infos.items():
+                    self.topic_infos[t] = ModelStatus.TopicStatus(t, ti)
+            except Exception:
+                self.logger.info(
+                    'No model %s found in classifier directory=%s' %
+                    (model_name, self.base_classifier_dir))
 
     def list_potential_models(self) -> List[str]:
         return sorted(os.listdir(self.base_classifier_dir))
 
-    def list_model_instances(self, model_name: str) -> List[str]:
-        model_dir = os.path.join(self.base_classifier_dir, model_name)
-        return sorted(os.listdir(model_dir))
+    def list_model_instances(self) -> List[str]:
+        try:
+            model_dir = os.path.join(self.base_classifier_dir, self.model_name)
+            return sorted(os.listdir(model_dir))
+        except Exception:
+            self.logger.info('No model %s found in classifier directory=%s' %
+                             (self.model_name, self.base_classifier_dir))
+            return []
 
-    def get_preferred_model_instance(self, model_name: str) -> str:
-        instances = self.list_model_instances(model_name)
-        for i in sorted(instances, reverse=True):
-            with open(
-                    os.path.join(self.base_classifier_dir, model_name, i,
-                                 'config.json')) as f:
-                try:
-                    d = json.loads(f.read())
-                    if d['is_released']:
-                        return i
-                except Exception:
-                    self.logger.info("Instance config wasn\'t loadable.")
+    def get_preferred_model_instance(self) -> str:
+        try:
+            return self.classifier.instance if self.model_name else ''
+        except Exception:
+            self.logger.info('No preferred instance found for model %s' %
+                             self.model_name)
         return ''
+
+    def get_bert(self) -> str:
+        try:
+            return self.classifier.instance_config.bert if (
+                self.model_name) else ''
+        except Exception:
+            self.logger.info(
+                'No preferred instance with BERT specified found for model %s' %
+                self.model_name)
+        return ''
+
+    def _build_status_dict(self) -> Dict[str, Any]:
+        bert = self.get_bert()
+        instances = self.list_model_instances()
+        if not instances:
+            return {
+                'name': self.model_name,
+                'error': 'Invalid model name %s' % self.model_name
+            }
+        preferred = self.get_preferred_model_instance()
+        quality_at_precision = self.classifier.quality_infos.get(
+            app.config['DESIRED_CLASSIFIER_PRECISION'], {})
+        topics = {}
+        for t, ti in self.classifier.topic_infos.items():
+            topics[t] = {
+                'name':
+                    t,
+                'samples':
+                    ti.num_samples,
+                'quality':
+                    ti.recalls.get(app.config['DESIRED_CLASSIFIER_PRECISION'],
+                                   0.0),
+            }
+        return {
+            'name': self.model_name,
+            'instances': instances,
+            'preferred': preferred,
+            'completeness': quality_at_precision.get('completeness', 0.0),
+            'extraneous': quality_at_precision.get('extra', 0.0),
+            'bert': bert,
+            'topics': topics
+        }
 
 
 @model_status_bp.route('/models', methods=['GET'])
@@ -45,12 +105,22 @@ def getModels() -> Any:
     # }
     args = request.args
 
+    model = args.get('model', default='')
+    verbose = args.get('verbose', default=True)
+
     status = ModelStatus(app.config['BASE_CLASSIFIER_DIR'])
     models = status.list_potential_models()
-    if not args.get('model', default=''):
+    if not verbose:
         return jsonify(models=models)
 
-    instances = status.list_model_instances(args['model'])
-    preferred = status.get_preferred_model_instance(args['model'])
+    if model:
+        status = ModelStatus(app.config['BASE_CLASSIFIER_DIR'],
+                             model_name=model)
+        return jsonify(status._build_status_dict())
 
-    return jsonify(instances=instances, preferred=preferred)
+    # TODO: Add typesjson to fix type problems in the results dict.
+    results: Dict[str, Any] = {}
+    for m in models:
+        status = ModelStatus(app.config['BASE_CLASSIFIER_DIR'], model_name=m)
+        results[m] = status._build_status_dict()
+    return jsonify(results)

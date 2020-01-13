@@ -25,6 +25,7 @@ def test_e2e(app: Flask, fs: FakeFilesystem) -> None:
         'react more swiftly to comply with international instruments %d')
     instance_path = './testdata/test_model/test_instance'
     fs.add_real_directory(instance_path)
+    fs.remove_object('./testdata/test_model/test_instance/quality.json')
     fs.remove_object('./testdata/test_model/test_instance/thresholds.json')
     client = app.test_client()
     with app.test_request_context():

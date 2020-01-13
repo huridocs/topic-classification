@@ -1,4 +1,5 @@
 {
+  "bert": "https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1",
   "google_acct_key_path": "./.credz/bert-classification-key.json",
   "bucket_name": "bert_classification_models",
   "model": "",

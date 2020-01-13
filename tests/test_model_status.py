@@ -22,9 +22,9 @@ class TestModelStatus:
     def test_instances(self, fs: FakeFilesystem) -> None:
         model = 'test_model'
         fs.add_real_directory(path.join(self.BASE_CLASSIFIER_PATH, model))
-        s = ModelStatus(self.BASE_CLASSIFIER_PATH)
+        s = ModelStatus(self.BASE_CLASSIFIER_PATH, model_name=model)
 
-        result = s.list_model_instances(model)
+        result = s.list_model_instances()
         assert result == [
             'test_instance', 'test_instance_missing_model',
             'test_instance_missing_variables',
@@ -36,7 +36,7 @@ class TestModelStatus:
         model = 'test_model'
         fs.add_real_directory('./testdata/test_model/test_instance')
         fs.add_real_directory('./testdata/test_model/test_instance_unreleased')
-        s = ModelStatus(self.BASE_CLASSIFIER_PATH)
+        s = ModelStatus(self.BASE_CLASSIFIER_PATH, model)
 
-        result = s.get_preferred_model_instance(model)
+        result = s.get_preferred_model_instance()
         assert result == 'test_instance'
