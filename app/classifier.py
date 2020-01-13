@@ -631,6 +631,8 @@ def add_samples() -> Any:
             response.append(
                 dict(seq=sample['seq'],
                      predicted_labels=response_sample.predicted_labels))
+        with sessionLock:
+            session.clear()
     return jsonify(dict(samples=response))
 
 
