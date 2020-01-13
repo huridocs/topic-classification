@@ -49,6 +49,8 @@ class ModelStatus:
             return []
 
     def get_preferred_model_instance(self) -> str:
+        if not self.classifier:
+            return ''
         try:
             return self.classifier.instance if self.model_name else ''
         except Exception:
@@ -57,6 +59,8 @@ class ModelStatus:
         return ''
 
     def get_bert(self) -> str:
+        if not self.classifier:
+            return ''
         try:
             return self.classifier.instance_config.bert if (
                 self.model_name) else ''
