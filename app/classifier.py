@@ -8,10 +8,12 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Set, Tuple
 
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 from flask import Blueprint
 from flask import current_app as app
 from flask import jsonify, request
+from utils import evaluate
 
 from app import tasks
 from app.embedder import MAX_SEQ_LENGTH, Embedder
@@ -249,8 +251,10 @@ class Classifier:
         # Split very large requests into chunks since
         # (intermediate) bert data is huge.
         if len(seqs) > batch_size:
-            return (self._classify_probs(seqs[:batch_size]) +
-                    self._classify_probs(seqs[batch_size:]))
+            result: List[Dict[str, float]] = []
+            for i in range(0, len(seqs), batch_size):
+                result += self._classify_probs(seqs[i:i + batch_size])
+            return result
 
         embeddings = self.embedder.get_embedding(seqs)
         embedding_shape = embeddings[0].shape
@@ -326,6 +330,8 @@ class Classifier:
         num_complete = 0.0
         sum_extra = 0.0
         missing_topics: Counter = Counter()
+        one_hot_labels: List[List[int]] = []
+        pred_one_hot_labels: List[List[int]] = []
         for i, sample_trains in enumerate(train_labels):
             num_found = 0
             for train_topic in sample_trains:
@@ -339,7 +345,17 @@ class Classifier:
             sum_extra += len([
                 q for q in sample_quality[i].values() if q >= precision / 100.0
             ]) - num_found
-
+            one_hot_labels.append(
+                [1 if t in sample_trains else 0 for t in self.vocab])
+            pred_one_hot_labels.append([
+                1 if sample_quality[i].get(t, 0.0) >= precision / 100.0 else 0
+                for t in self.vocab
+            ])
+        eval_quality = evaluate.evaluate(
+            pd.DataFrame(
+                dict(one_hot_labels=one_hot_labels,
+                     pred_one_hot_label=pred_one_hot_labels)), self.vocab)
+        print('%d: %s' % (precision, eval_quality.to_string(max_rows=1000)))
         completeness = num_complete / len(train_labels) * 100
         extra = sum_extra / len(train_labels)
         return (precision, completeness, extra, missing_topics)
@@ -423,7 +439,8 @@ class Classifier:
             [dict(topic=t, quality=q) for t, q in sample_probs.items()],
             key=lambda o: -o['quality'])
 
-    def refresh_predictions(self, limit: int = 2000) -> None:
+    def refresh_predictions(self, limit: int = 2000,
+                            batch_size: int = 1000) -> None:
         with sessionLock:
             samples: List[ClassificationSample] = list(
                 ClassificationSample.query.find(
@@ -431,13 +448,25 @@ class Classifier:
                                                        ]).limit(limit))
             seqs = [s.seq for s in samples]
 
-        sample_probs = self.classify(seqs)
+        for i in range(0, len(seqs), batch_size):
+            sample_probs = self.classify(seqs[i:i + batch_size])
 
-        with sessionLock:
-            for i, sample in enumerate(samples):
-                sample.predicted_labels = (
-                    Classifier.quality_to_predicted_labels(sample_probs[i]))
-            session.flush()
+            with sessionLock:
+                for i, seq in enumerate(seqs[i:i + batch_size]):
+                    sample: ClassificationSample = (
+                        ClassificationSample.query.get(model=self.model_name,
+                                                       seqHash=hasher(seq)))
+                    if sample:
+                        sample.predicted_labels = (
+                            Classifier.quality_to_predicted_labels(
+                                sample_probs[i]))
+                    else:
+                        print('ERROR: lost sample')
+                session.flush()
+                # This is harsh, but it seems otherwise some cache builds up
+                # inside ming and eventually OOM's the application...
+                # Thankfully, due to sessionLock this should be safe.
+                session.clear()
 
 
 class ClassifierCache:
@@ -545,7 +574,8 @@ def add_samples() -> Any:
     #                                 'training_labels'?: [
     #                                     {'topic':"Murder},
     #                                     {'topic': 'Justice'}]},
-    #                                ...] }
+    #                                ...],
+    #                    'refresh_predictions': true }
     # returns {'samples': [{'seq': "hello world", "predicted_labels": [...]}]}
     data = request.get_json()
     args = request.args
@@ -557,6 +587,9 @@ def add_samples() -> Any:
     response = []
 
     c = ClassifierCache.get(app.config['BASE_CLASSIFIER_DIR'], args['model'])
+
+    refresh_predictions = (data['refresh_predictions']
+                           if 'refresh_predictions' in data else False)
 
     for i, sample in enumerate(data['samples']):
         seqHash = hasher(sample['seq'])
@@ -585,7 +618,7 @@ def add_samples() -> Any:
             session.flush()
         processed.add(seqHash)
         if response_sample:
-            if not response_sample.predicted_labels:
+            if not response_sample.predicted_labels or refresh_predictions:
                 predicted_labels = (Classifier.quality_to_predicted_labels(
                     c.classify([sample['seq']])[0]))
                 with sessionLock:

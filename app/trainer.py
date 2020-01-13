@@ -176,7 +176,8 @@ class Trainer:
               limit: int,
               forced_instance: str = '',
               train_ratio: float = 0.9,
-              num_train_steps: int = 1000) -> Classifier:
+              num_train_steps: int = 1000,
+              test_subset_csv: str = '') -> Classifier:
         # timestamp = str(1578318208)
         timestamp = str(int(datetime.utcnow().timestamp()))
         if forced_instance:
@@ -215,12 +216,34 @@ class Trainer:
                 dict(bert=embedder.bert,
                      vocab='label.vocab',
                      is_released=False,
+                     training_subset_path='test_seqs.csv',
                      description='From Trainer.train'), f)
-        train_values = data.sample(frac=train_ratio, random_state=42)
+
+        if test_subset_csv:
+            BLERG
+            subset_seqs: List[str] = []
+            if subset_file:
+                with open(subset_file, 'r') as subset_handle:
+                    subset_seqs = [
+                        row[0]
+                        for row in csv.reader(subset_handle, delimiter=',')
+                        if row
+                    ]
+            print('Subset example: ', subset_seqs[:1])
+            train_values = data.drop()
+        else:
+            train_values = data.sample(frac=train_ratio, random_state=42)
+
         test_values = data.drop(train_values.index)
 
+        with open(os.path.join(instance_path, 'train_seqs.csv'), 'w') as f:
+            writer = csv.writer(f)
+            writer.writerow(['text'])
+            for index, row in train_values.iterrows():
+                writer.writerow([row.seq])
         with open(os.path.join(instance_path, 'test_seqs.csv'), 'w') as f:
             writer = csv.writer(f)
+            writer.writerow(['text'])
             for index, row in test_values.iterrows():
                 writer.writerow([row.seq])
 
