@@ -6,7 +6,7 @@
       "type": "python",
       "request": "launch",
       "module": "flask",
-      "args": ["run", "--no-debugger", "--no-reload"],
+      "args": ["run", "--no-debugger", "--no-reload", "--port=5005"],
       "jinja": true
     },
     {
