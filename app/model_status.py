@@ -6,7 +6,8 @@ from flask import Blueprint
 from flask import current_app as app
 from flask import jsonify, request
 
-from app.classifier import Classifier, TopicInfo
+from app.classifier import Classifier
+from app.TopicInfo import TopicInfo
 
 model_status_bp = Blueprint('model_status_bp', __name__)
 
