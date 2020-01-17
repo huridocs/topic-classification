@@ -17,101 +17,10 @@ from app import tasks
 from app.embedder import MAX_SEQ_LENGTH, Embedder
 from app.model_config import InstanceConfig
 from app.models import ClassificationSample, hasher, session, sessionLock
+from app.TopicInfo import save_thresholds, TopicInfo
+from app.threshold_optimization import ComputeThresholds
 
 classify_bp = Blueprint('classify_bp', __name__)
-
-
-class TopicInfo:
-    """Collect thresholding and quality information about one topic."""
-
-    def __init__(self, topic: str):
-        self.topic = topic
-        self.num_samples = 0
-        self.thresholds: Dict[int, float] = {}
-        self.recalls: Dict[int, float] = {}
-        self.suggested_threshold = 1.1
-        self.f1_quality_at_suggested = 0.0
-        self.precision_at_suggested = 0.0
-
-    def to_json_dict(self) -> Dict[str, Any]:
-        return self.__dict__
-
-    def load_json_dict(self, v: Dict[str, Any]) -> None:
-        self.__dict__ = v
-        self.thresholds = {int(k): v for k, v in self.thresholds.items()}
-        self.recalls = {int(k): v for k, v in self.recalls.items()}
-
-    def get_quality(self, prob: float) -> float:
-        quality = 0.0
-        for precision_100, threshold in self.thresholds.items():
-            if prob >= threshold:
-                quality = precision_100 / 100.0
-        return quality
-
-    def __str__(self) -> str:
-        res = [
-            '%s has %d train, suggested quality %.02f@t=%.02f' %
-            (self.topic, self.num_samples, self.f1_quality_at_suggested,
-             self.suggested_threshold)
-        ]
-        for thres in self.thresholds.keys():
-            res.append(
-                '  t=%.02f -> %.02f@p%.01f' %
-                (self.thresholds[thres], self.recalls[thres], thres / 100.0))
-        return '\n'.join(res)
-
-
-def compute_precision(true_pos: float, false_pos: float) -> float:
-    if true_pos + false_pos > 0:
-        return true_pos / (true_pos + false_pos)
-    return 0.0
-
-
-def compute_recall(true_pos: float, train_probs: List[float]) -> float:
-    if len(train_probs) > 0:
-        return true_pos / len(train_probs)
-    return 0.0
-
-
-def compute_f1(precision: float, recall: float) -> float:
-    if precision + recall > 0:
-        return 2 * precision * recall / (precision + recall)
-    return 0.0
-
-
-def ComputeThresholds(topic: str, train_probs: List[float],
-                      false_probs: List[float]) -> TopicInfo:
-
-    ti = TopicInfo(topic)
-    ti.num_samples = len(train_probs)
-
-    # keep threshold in range with minimum 0.05 and maximum 0.95
-    for thres in np.arange(0.05, 1, 0.05):
-
-        true_pos = sum([1.0 for p in train_probs if p >= thres])
-        false_pos = sum([1.0 for p in false_probs if p >= thres])
-
-        precision = compute_precision(true_pos, false_pos)
-        recall = compute_recall(true_pos, train_probs)
-        f1 = compute_f1(precision, recall)
-
-        # Only increase suggested_threshold until precision hits 50%
-        if (precision >= 0.3 and f1 > ti.f1_quality_at_suggested and
-                ti.precision_at_suggested <= 0.3):
-            ti.precision_at_suggested = precision
-            ti.f1_quality_at_suggested = f1
-            ti.suggested_threshold = thres
-
-            # Choose default threshold for categories with too less samples
-            if ti.num_samples < 10:
-                return ti
-
-        for target in [20, 30, 40, 50, 60, 70, 80, 90]:
-            if (target not in ti.thresholds and precision >= target / 100.0):
-                ti.thresholds[target] = thres
-                ti.recalls[target] = recall
-
-    return ti
 
 
 class Classifier:
@@ -372,37 +281,31 @@ class Classifier:
             self.topic_infos[ti.topic] = ti
 
         path_to_thresholds = os.path.join(self.instance_dir, 'thresholds.json')
-        with open(path_to_thresholds, 'w') as f:
-            f.write(
-                json.dumps(
-                    {t: v.to_json_dict()
-                     for t, v in self.topic_infos.items()},
-                    indent=4,
-                    sort_keys=True))
+        save_thresholds(self.topic_infos, path_to_thresholds)
 
-        # Calculate and write out quality information at precision intervals
-        sample_quality = self._props_to_quality(sample_probs)
-        precision_quality: Dict[int, Dict[str, Any]] = {}
-        for precision in [30, 40, 50, 60, 70, 80, 90]:
-            _, completeness, extra, missing_topics = self._quality_at_precision(
-                precision, sample_quality, train_labels)
-            top_missing_topics = {
-                k: (float(v) / len(train_labels) * 100)
-                for (k, v) in missing_topics.most_common(10)
-            }
-            precision_quality[precision] = {
-                'completeness': completeness,
-                'extra': extra,
-                'missing': top_missing_topics
-            }
+        ## Calculate and write out quality information at precision intervals
+        #sample_quality = self._props_to_quality(sample_probs)
+        #precision_quality: Dict[int, Dict[str, Any]] = {}
+        #for precision in [30, 40, 50, 60, 70, 80, 90]:
+        #    _, completeness, extra, missing_topics = self._quality_at_precision(
+        #        precision, sample_quality, train_labels)
+        #    top_missing_topics = {
+        #        k: (float(v) / len(train_labels) * 100)
+        #        for (k, v) in missing_topics.most_common(10)
+        #    }
+        #    precision_quality[precision] = {
+        #        'completeness': completeness,
+        #        'extra': extra,
+        #        'missing': top_missing_topics
+        #    }
 
-        path_to_quality = os.path.join(self.instance_dir, 'quality.json')
-        with open(path_to_quality, 'w') as f:
-            f.write(
-                json.dumps({t: v
-                            for t, v in precision_quality.items()},
-                           indent=4,
-                           sort_keys=True))
+        #path_to_quality = os.path.join(self.instance_dir, 'quality.json')
+        #with open(path_to_quality, 'w') as f:
+        #    f.write(
+        #        json.dumps({t: v
+        #                    for t, v in precision_quality.items()},
+        #                   indent=4,
+        #                   sort_keys=True))
 
     @staticmethod
     def quality_to_predicted_labels(sample_probs: Dict[str, float]
