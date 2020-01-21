@@ -29,12 +29,12 @@ class TopicInfo:
         self.thresholds = {int(k): v for k, v in self.thresholds.items()}
         self.recalls = {int(k): v for k, v in self.recalls.items()}
 
-    def get_quality(self, prob: float) -> float:
-        quality = 0.0
-        for precision_100, threshold in self.thresholds.items():
-            if prob >= threshold:
-                quality = precision_100 / 100.0
-        return quality
+    def get_quality(self, prob: float) -> Any:
+        scores = self.scores[self.scores.threshold >= prob]
+        if len(scores) > 0:
+            quality = scores.iloc[0].f1
+            return quality
+        return 0.5
 
     def __str__(self) -> str:
         res = [

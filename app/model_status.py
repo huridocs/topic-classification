@@ -80,13 +80,9 @@ class ModelStatus:
         topics = {}
         for t, ti in self.classifier.topic_infos.items():
             topics[t] = {
-                'name':
-                    t,
-                'samples':
-                    ti.num_samples,
-                'quality':
-                    ti.recalls.get(app.config['DESIRED_CLASSIFIER_PRECISION'],
-                                   0.0),
+                'name': t,
+                'samples': ti.num_samples,
+                'quality': ti.f1_quality_at_suggested
             }
         return {
             'name': self.model_name,
