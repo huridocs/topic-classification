@@ -75,21 +75,17 @@ class ModelStatus:
                 'error': 'Invalid model name %s' % self.model_name
             }
         preferred = self.get_preferred_model_instance()
-        quality_at_precision = self.classifier.quality_infos.get(
-            app.config['DESIRED_CLASSIFIER_PRECISION'], {})
         topics = {}
         for t, ti in self.classifier.topic_infos.items():
             topics[t] = {
                 'name': t,
                 'samples': ti.num_samples,
-                'quality': ti.f1_quality_at_suggested
+                'quality': ti.get_quality()
             }
         return {
             'name': self.model_name,
             'instances': instances,
             'preferred': preferred,
-            'completeness': quality_at_precision.get('completeness', 0.0),
-            'extraneous': quality_at_precision.get('extra', 0.0),
             'bert': bert,
             'topics': topics
         }

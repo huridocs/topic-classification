@@ -10,8 +10,6 @@ class TopicInfo:
     def __init__(self, topic: str):
         self.topic = topic
         self.num_samples = 0
-        self.thresholds: Dict[int, float] = {}
-        self.recalls: Dict[int, float] = {}
         self.suggested_threshold = 0.5
         self.f1_quality_at_suggested = 0.0
         self.precision_at_suggested = 0.0
@@ -26,10 +24,12 @@ class TopicInfo:
     def load_json_dict(self, v: Dict[str, Any]) -> None:
         self.__dict__ = v
         self.scores = pd.read_json(self.scores)
-        self.thresholds = {int(k): v for k, v in self.thresholds.items()}
-        self.recalls = {int(k): v for k, v in self.recalls.items()}
 
-    def get_quality(self, prob: float) -> Any:
+    def get_quality(self) -> float:
+        return self.f1_quality_at_suggested
+
+    def get_confidence_at_probability(self, prob: float) -> Any:
+        # TODO: include distance between threshold and probability
         scores = self.scores[self.scores.threshold >= prob]
         if len(scores) > 0:
             quality = scores.iloc[0].f1
@@ -42,10 +42,6 @@ class TopicInfo:
             (self.topic, self.num_samples, self.f1_quality_at_suggested,
              self.suggested_threshold)
         ]
-        for thres in self.thresholds.keys():
-            res.append(
-                '  t=%.02f -> %.02f@p%.01f' %
-                (self.thresholds[thres], self.recalls[thres], thres / 100.0))
         return '\n'.join(res)
 
 

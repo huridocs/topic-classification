@@ -42,7 +42,6 @@ class Classifier:
         self.model_name = model_name
         self.model_config_path = os.path.join(base_classifier_dir, model_name)
         self.topic_infos: Dict[str, TopicInfo] = {}
-        self.quality_infos: Dict[str, Dict[str, Any]] = {}
         self._load_instance_config()
 
     def _load_instance_config(self) -> None:
@@ -61,7 +60,6 @@ class Classifier:
                                                      self.instance)
                     self._init_vocab()
                     self._init_thresholds()
-                    self._init_quality()
                     self._init_embedding()
                     self._init_predictor()
                     return
@@ -125,23 +123,6 @@ class Classifier:
                 'Failure to load thresholds file from %s with exception: %s' %
                 (path_to_thresholds, e))
 
-    def _init_quality(self) -> None:
-        path_to_quality = os.path.join(self.instance_dir, 'quality.json')
-        try:
-            if not os.path.exists(path_to_quality):
-                self.logger.warning(
-                    ('The model at %s does not have quality, ' +
-                     'consider ./run local --mode thresholds --model %s') %
-                    (self.instance_dir, self.model_name))
-            else:
-                with open(path_to_quality, 'r') as f:
-                    for k, v in json.load(f).items():
-                        self.quality_infos[k] = v
-        except Exception as e:
-            raise Exception(
-                'Failure to load quality file from %s with exception: %s' %
-                (path_to_quality, e))
-
     def _classify_probs(self, seqs: List[str],
                         batch_size: int = 1000) -> List[Dict[str, float]]:
         if len(seqs) == 0:
@@ -187,7 +168,7 @@ class Classifier:
         topic_quality: List[Dict[str, float]] = [{}] * len(topic_probs)
         for i in range(len(topic_probs)):
             topic_quality[i] = {
-                t: self.topic_infos[t].get_quality(p)
+                t: self.topic_infos[t].get_confidence_at_probability(p)
                 for t, p in topic_probs[i].items()
                 if p >= self.topic_infos[t].suggested_threshold
             }
@@ -283,29 +264,6 @@ class Classifier:
         path_to_thresholds = os.path.join(self.instance_dir, 'thresholds.json')
         save_thresholds(self.topic_infos, path_to_thresholds)
 
-        ## Calculate and write out quality information at precision intervals
-        #sample_quality = self._props_to_quality(sample_probs)
-        #precision_quality: Dict[int, Dict[str, Any]] = {}
-        #for precision in [30, 40, 50, 60, 70, 80, 90]:
-        #    _, completeness, extra, missing_topics = self._quality_at_precision(
-        #        precision, sample_quality, train_labels)
-        #    top_missing_topics = {
-        #        k: (float(v) / len(train_labels) * 100)
-        #        for (k, v) in missing_topics.most_common(10)
-        #    }
-        #    precision_quality[precision] = {
-        #        'completeness': completeness,
-        #        'extra': extra,
-        #        'missing': top_missing_topics
-        #    }
-
-        #path_to_quality = os.path.join(self.instance_dir, 'quality.json')
-        #with open(path_to_quality, 'w') as f:
-        #    f.write(
-        #        json.dumps({t: v
-        #                    for t, v in precision_quality.items()},
-        #                   indent=4,
-        #                   sort_keys=True))
 
     @staticmethod
     def quality_to_predicted_labels(sample_probs: Dict[str, float]
