@@ -46,7 +46,7 @@ def build_score_matrix(train_probs: List[float],
 
     matrix = pd.DataFrame(scores, columns=['threshold', 'f1',
                                            'precision', 'recall'])
-    return matrix
+    return matrix.round(2)
 
 
 def optimize_threshold(scores: pd.DataFrame, min_prec: float = 0.3) -> Any:

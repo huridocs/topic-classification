@@ -50,11 +50,11 @@ class Test_thresholdOptimization:
         train_probs = [0.7, 0.8, 0.9, 0.99]
         false_probs = [0.2, 0.4, 0.7]
         scores = build_score_matrix(train_probs, false_probs)
-        thresholds = np.arange(0.05, 1, 0.05)
+        thresholds = [round(elem, 2) for elem in np.arange(0.05, 1, 0.05)]
 
         assert np.equal(scores.threshold.values, thresholds).all()
         assert (scores <= 1.0).all().all() and (scores >= 0.0).all().all()
-        assert (scores[scores['threshold'] <= 0.7].recall == 1.0).all()
+        assert (scores[scores['threshold'] >= 0.75].precision == 1.0).all()
 
     def test_optimize_threshold(self) -> None:
         scores = pd.DataFrame(
