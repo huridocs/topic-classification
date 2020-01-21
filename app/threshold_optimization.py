@@ -1,5 +1,6 @@
+import json
 import math
-from typing import Any, List, Tuple
+from typing import Any, Dict, List, Tuple
 
 import numpy as np
 import pandas as pd
@@ -44,8 +45,8 @@ def build_score_matrix(train_probs: List[float],
         f1, precision, recall = compute_scores(train_probs, false_probs, thres)
         scores.append((thres, f1, precision, recall))
 
-    matrix = pd.DataFrame(scores, columns=['threshold', 'f1',
-                                           'precision', 'recall'])
+    matrix = pd.DataFrame(scores,
+                          columns=['threshold', 'f1', 'precision', 'recall'])
     return matrix.round(2)
 
 
@@ -88,3 +89,12 @@ def ComputeThresholds(topic: str, train_probs: List[float],
                                         threshold].f1.iloc()[0]
 
     return ti
+
+
+def save_thresholds(topic_infos: Dict[str, TopicInfo], path: str) -> None:
+    with open(path, 'w') as f:
+        f.write(
+            json.dumps({t: v.to_json_dict()
+                        for t, v in topic_infos.items()},
+                       indent=4,
+                       sort_keys=True))

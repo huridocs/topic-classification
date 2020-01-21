@@ -1,4 +1,3 @@
-import json
 from typing import Any, Dict
 
 import pandas as pd
@@ -13,8 +12,8 @@ class TopicInfo:
         self.suggested_threshold = 0.5
         self.f1_quality_at_suggested = 0.0
         self.precision_at_suggested = 0.0
-        self.scores = pd.DataFrame(columns=['threshold', 'f1',
-                                            'precision', 'recall'])
+        self.scores = pd.DataFrame(
+            columns=['threshold', 'f1', 'precision', 'recall'])
 
     def to_json_dict(self) -> Dict[str, Any]:
         obj_dict = self.__dict__
@@ -43,12 +42,3 @@ class TopicInfo:
              self.suggested_threshold)
         ]
         return '\n'.join(res)
-
-
-def save_thresholds(topic_infos: Dict[str, TopicInfo], path: str) -> None:
-    with open(path, 'w') as f:
-        f.write(
-            json.dumps({t: v.to_json_dict()
-                        for t, v in topic_infos.items()},
-                       indent=4,
-                       sort_keys=True))
