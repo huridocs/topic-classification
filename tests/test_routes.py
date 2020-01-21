@@ -68,12 +68,11 @@ def test_all_model_status(app: Flask, fs: FakeFilesystem) -> None:
         'quality': 0.81,
         'samples': 86
     }
-    assert result['test_model']['topics'][
-        'Trafficking'] == {
-            'name': 'Trafficking',
-            'samples': 140,
-            'quality': 0.99
-        }
+    assert result['test_model']['topics']['Trafficking'] == {
+        'name': 'Trafficking',
+        'samples': 140,
+        'quality': 0.99
+    }
 
 
 def test_model_status(app: Flask, fs: FakeFilesystem) -> None:

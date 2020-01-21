@@ -1,13 +1,9 @@
+import numpy as np
+import pandas as pd
 import pytest
 
-import numpy as np
-import numpy.testing as npt
-import pandas as pd
-
-from app.threshold_optimization import ComputeThresholds
-from app.threshold_optimization import compute_scores
-from app.threshold_optimization import build_score_matrix
-from app.threshold_optimization import optimize_threshold
+from app.threshold_optimization import (ComputeThresholds, build_score_matrix,
+                                        compute_scores, optimize_threshold)
 
 
 class Test_thresholdOptimization:
@@ -66,13 +62,10 @@ class Test_thresholdOptimization:
         assert optimize_threshold(scores, min_prec=1.1) == 0.5
 
     def test_optimize_threshold_multimax(self) -> None:
-        scores = pd.DataFrame([(0.3, 0.7, 0.3, 0.9),
-                               (0.4, 0.7, 0.6, 0.7),
-                               (0.5, 0.7, 0.4, 0.8),
-                               (0.6, 0.7, 0.7, 0.7),
-                               (0.7, 0.7, 0.9, 0.5)],
-                              columns=['threshold', 'f1',
-                                       'precision', 'recall'])
+        scores = pd.DataFrame(
+            [(0.3, 0.7, 0.3, 0.9), (0.4, 0.7, 0.6, 0.7), (0.5, 0.7, 0.4, 0.8),
+             (0.6, 0.7, 0.7, 0.7), (0.7, 0.7, 0.9, 0.5)],
+            columns=['threshold', 'f1', 'precision', 'recall'])
         assert optimize_threshold(scores) == 0.5
         assert optimize_threshold(scores, 0.6) == 0.6
         assert optimize_threshold(scores, 0.7) == 0.7

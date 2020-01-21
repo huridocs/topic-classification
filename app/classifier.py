@@ -17,8 +17,8 @@ from app import tasks
 from app.embedder import MAX_SEQ_LENGTH, Embedder
 from app.model_config import InstanceConfig
 from app.models import ClassificationSample, hasher, session, sessionLock
-from app.TopicInfo import save_thresholds, TopicInfo
-from app.threshold_optimization import ComputeThresholds
+from app.threshold_optimization import ComputeThresholds, save_thresholds
+from app.TopicInfo import TopicInfo
 
 classify_bp = Blueprint('classify_bp', __name__)
 
@@ -263,7 +263,6 @@ class Classifier:
 
         path_to_thresholds = os.path.join(self.instance_dir, 'thresholds.json')
         save_thresholds(self.topic_infos, path_to_thresholds)
-
 
     @staticmethod
     def quality_to_predicted_labels(sample_probs: Dict[str, float]

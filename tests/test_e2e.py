@@ -37,17 +37,16 @@ def test_e2e(app: Flask, fs: FakeFilesystem) -> None:
         assert data['Poverty'] == 0.5
 
         # now we add training labels and optimize the thresholds
-        assert client.put(
-            '/classification_sample?model=test_model',
-            data=json.dumps({
-                'samples': [{
-                    'seq': seq_pattern % i,
-                    'training_labels': [{
-                        'topic': 'Poverty'
-                    }]
-                } for i in range(20)]
-            }),
-            content_type='application/json').status == '200 OK'
+        assert client.put('/classification_sample?model=test_model',
+                          data=json.dumps({
+                              'samples': [{
+                                  'seq': seq_pattern % i,
+                                  'training_labels': [{
+                                      'topic': 'Poverty'
+                                  }]
+                              } for i in range(20)]
+                          }),
+                          content_type='application/json').status == '200 OK'
 
         resp = client.get('/classification_sample?model=test_model&seq=*')
         assert resp.status == '200 OK'
