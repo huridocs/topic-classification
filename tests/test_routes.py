@@ -32,12 +32,12 @@ def test_classify(app: Flask, fs: FakeFilesystem) -> None:
         resp = client.post(
             '/classify?model=test_model',
             data=json.dumps(
-                {'seqs': ['take forceful action to improve childrens rights']}),
+                {'seqs': ['improve access to health care for children']}),
             content_type='application/json')
     assert resp.status == '200 OK'
     result = json.loads(resp.data)
-    assert result
-    assert result[0]['Rights of the Child'] >= 0.7
+    assert len(result) == 1
+    assert result[0]['Right to health'] >= 0.5
 
 
 def test_all_model_status(app: Flask, fs: FakeFilesystem) -> None:
@@ -63,16 +63,16 @@ def test_all_model_status(app: Flask, fs: FakeFilesystem) -> None:
     ]
     assert result['test_model']['preferred'] == 'test_instance'
     # Pick two random test topics to assert
-    assert result['test_model']['topics']['Asylum-seekers - refugees'] == {
-        'name': 'Asylum-seekers - refugees',
-        'quality': 1.0,
-        'samples': 260
+    assert result['test_model']['topics']['Poverty'] == {
+        'name': 'Poverty',
+        'quality': 0.81,
+        'samples': 86
     }
     assert result['test_model']['topics'][
-        'National Human Rights Institution'] == {
-            'name': 'National Human Rights Institution',
-            'quality': 1.0,
-            'samples': 552
+        'Trafficking'] == {
+            'name': 'Trafficking',
+            'samples': 140,
+            'quality': 0.99
         }
 
 
@@ -93,13 +93,13 @@ def test_model_status(app: Flask, fs: FakeFilesystem) -> None:
     assert result['instances'] == ['test_instance', 'test_instance_unreleased']
     assert result['preferred'] == 'test_instance'
     # Pick two random test topics to assert
-    assert result['topics']['Asylum-seekers - refugees'] == {
-        'name': 'Asylum-seekers - refugees',
-        'quality': 1.0,
-        'samples': 260
-    }
-    assert result['topics']['National Human Rights Institution'] == {
-        'name': 'National Human Rights Institution',
-        'quality': 1.0,
-        'samples': 552
-    }
+    # assert result['topics']['Asylum-seekers - refugees'] == {
+    #     'name': 'Asylum-seekers - refugees',
+    #     'quality': 1.0,
+    #     'samples': 260
+    # }
+    # assert result['topics']['National Human Rights Institution'] == {
+    #     'name': 'National Human Rights Institution',
+    #     'quality': 1.0,
+    #     'samples': 552
+    # }
