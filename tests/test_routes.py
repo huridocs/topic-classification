@@ -62,16 +62,17 @@ def test_all_model_status(app: Flask, fs: FakeFilesystem) -> None:
         'test_instance', 'test_instance_unreleased'
     ]
     assert result['test_model']['preferred'] == 'test_instance'
-    # Pick two random test topics to assert
+    # Pick random test topics to assert
     assert result['test_model']['topics']['Poverty'] == {
         'name': 'Poverty',
         'quality': 0.81,
-        'samples': 86
+        'samples': 178
     }
-    assert result['test_model']['topics']['Trafficking'] == {
-        'name': 'Trafficking',
-        'samples': 140,
-        'quality': 0.99
+    # Pick topic with not enough samples for threshold optimization
+    assert result['test_model']['topics']['nan'] == {
+        'name': 'nan',
+        'samples': 0,
+        'quality': 0.0
     }
 
 

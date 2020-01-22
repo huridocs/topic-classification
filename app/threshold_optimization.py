@@ -47,7 +47,7 @@ def build_score_matrix(train_probs: List[float],
 
     matrix = pd.DataFrame(scores,
                           columns=['threshold', 'f1', 'precision', 'recall'])
-    return matrix.round(2)
+    return matrix.round(2).set_index('threshold')
 
 
 def optimize_threshold(scores: pd.DataFrame, min_prec: float = 0.3) -> Any:
@@ -56,12 +56,12 @@ def optimize_threshold(scores: pd.DataFrame, min_prec: float = 0.3) -> Any:
     if len(scores) == 0:
         return 0.5
     max_f1 = scores.f1.max()
-    thresholds = scores[scores.f1 == max_f1].threshold
+    thresholds = scores[scores.f1 == max_f1].index
     # if at multiple thresholds the max f1 is reached select central index
     if len(thresholds) > 1:
         central_ind = math.floor(len(thresholds) / 2)
-        return thresholds.iloc[central_ind]
-    return thresholds.iloc[0]
+        return thresholds[central_ind]
+    return thresholds[0]
 
 
 def ComputeThresholds(topic: str, train_probs: List[float],
@@ -74,8 +74,9 @@ def ComputeThresholds(topic: str, train_probs: List[float],
     if ti.num_samples < 10:
         f1, precision, recall = compute_scores(train_probs, false_probs,
                                                ti.suggested_threshold)
-        ti.f1_quality_at_suggested = f1
-        ti.precision_at_suggested = precision
+        ti.scores = pd.DataFrame([(f1, precision, recall)],
+                                 columns=['f1', 'precision', 'recall'],
+                                 index=[ti.suggested_threshold])
         return ti
 
     # else optimize threshold based on scores
@@ -83,11 +84,6 @@ def ComputeThresholds(topic: str, train_probs: List[float],
     threshold = optimize_threshold(scores)
     ti.scores = scores
     ti.suggested_threshold = threshold
-    ti.precision_at_suggested = scores[scores.threshold ==
-                                       threshold].precision.iloc[0]
-    ti.f1_quality_at_suggested = scores[scores.threshold ==
-                                        threshold].f1.iloc()[0]
-
     return ti
 
 

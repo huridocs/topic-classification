@@ -48,24 +48,26 @@ class Test_thresholdOptimization:
         scores = build_score_matrix(train_probs, false_probs)
         thresholds = [round(elem, 2) for elem in np.arange(0.05, 1, 0.05)]
 
-        assert np.equal(scores.threshold.values, thresholds).all()
+        assert np.equal(scores.index.values, thresholds).all()
         assert (scores <= 1.0).all().all() and (scores >= 0.0).all().all()
-        assert (scores[scores['threshold'] >= 0.75].precision == 1.0).all()
+        assert (scores.loc[scores.index.values >= 0.75].precision == 1.0).all()
 
     def test_optimize_threshold(self) -> None:
-        scores = pd.DataFrame(
-            [(0.2, 0.3, 0.2, 0.4), (0.4, 0.7, 0.8, 0.6), (0.7, 0.8, 0.7, 0.9)],
-            columns=['threshold', 'f1', 'precision', 'recall'])
+        scores = pd.DataFrame([(0.3, 0.2, 0.4), (0.7, 0.8, 0.6),
+                               (0.8, 0.7, 0.9)],
+                              columns=['f1', 'precision', 'recall'],
+                              index=[0.2, 0.4, 0.7])
         assert optimize_threshold(scores) == 0.7
         assert optimize_threshold(scores, min_prec=0.8) == 0.4
         # if minimum precision cannot be achieved return default threshold
         assert optimize_threshold(scores, min_prec=1.1) == 0.5
 
     def test_optimize_threshold_multimax(self) -> None:
-        scores = pd.DataFrame(
-            [(0.3, 0.7, 0.3, 0.9), (0.4, 0.7, 0.6, 0.7), (0.5, 0.7, 0.4, 0.8),
-             (0.6, 0.7, 0.7, 0.7), (0.7, 0.7, 0.9, 0.5)],
-            columns=['threshold', 'f1', 'precision', 'recall'])
+        scores = pd.DataFrame([(0.7, 0.3, 0.9), (0.7, 0.6, 0.7),
+                               (0.7, 0.4, 0.8), (0.7, 0.7, 0.7),
+                               (0.7, 0.9, 0.5)],
+                              columns=['f1', 'precision', 'recall'],
+                              index=[0.3, 0.4, 0.5, 0.6, 0.7])
         assert optimize_threshold(scores) == 0.5
         assert optimize_threshold(scores, 0.6) == 0.6
         assert optimize_threshold(scores, 0.7) == 0.7
