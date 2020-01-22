@@ -2,11 +2,10 @@ import numpy as np
 import pandas as pd
 import pytest
 
-from app.threshold_optimization import (ComputeThresholds, build_score_matrix,
-                                        compute_scores, optimize_threshold)
+from app.thresholds import build_score_matrix, compute, compute_scores, optimize
 
 
-class Test_thresholdOptimization:
+class TestThresholds:
 
     def test_compute_scores(self) -> None:
         train_probs = [0.7, 0.8, 0.9, 0.99]
@@ -33,13 +32,13 @@ class Test_thresholdOptimization:
         assert recall == 0.0
         assert f1 == 0.0
 
-    def test_compute_thresholds_default(self) -> None:
+    def test_compute_default(self) -> None:
         """Return default threshold if not enough training samples are given"""
-        default_ti = ComputeThresholds('test', [0.4, 0.5, 0.7], [0.1, 0.1])
+        default_ti = compute('test', [0.4, 0.5, 0.7], [0.1, 0.1])
         assert default_ti.suggested_threshold == 0.5
 
-    def test_compute_thresholds_optimized(self) -> None:
-        ti = ComputeThresholds('optimized threshold', [0.8] * 20, [0.1] * 20)
+    def test_compute_optimized(self) -> None:
+        ti = compute('optimized threshold', [0.8] * 20, [0.1] * 20)
         assert ti.suggested_threshold == 0.5
 
     def test_build_score_matrix(self) -> None:
@@ -52,23 +51,23 @@ class Test_thresholdOptimization:
         assert (scores <= 1.0).all().all() and (scores >= 0.0).all().all()
         assert (scores.loc[scores.index.values >= 0.75].precision == 1.0).all()
 
-    def test_optimize_threshold(self) -> None:
+    def test_optimize(self) -> None:
         scores = pd.DataFrame([(0.3, 0.2, 0.4), (0.7, 0.8, 0.6),
                                (0.8, 0.7, 0.9)],
                               columns=['f1', 'precision', 'recall'],
                               index=[0.2, 0.4, 0.7])
-        assert optimize_threshold(scores) == 0.7
-        assert optimize_threshold(scores, min_prec=0.8) == 0.4
+        assert optimize(scores) == 0.7
+        assert optimize(scores, min_prec=0.8) == 0.4
         # if minimum precision cannot be achieved return default threshold
-        assert optimize_threshold(scores, min_prec=1.1) == 0.5
+        assert optimize(scores, min_prec=1.1) == 0.5
 
-    def test_optimize_threshold_multimax(self) -> None:
+    def test_optimize__multimax(self) -> None:
         scores = pd.DataFrame([(0.7, 0.3, 0.9), (0.7, 0.6, 0.7),
                                (0.7, 0.4, 0.8), (0.7, 0.7, 0.7),
                                (0.7, 0.9, 0.5)],
                               columns=['f1', 'precision', 'recall'],
                               index=[0.3, 0.4, 0.5, 0.6, 0.7])
-        assert optimize_threshold(scores) == 0.5
-        assert optimize_threshold(scores, 0.6) == 0.6
-        assert optimize_threshold(scores, 0.7) == 0.7
-        assert optimize_threshold(scores, 0.9) == 0.7
+        assert optimize(scores) == 0.5
+        assert optimize(scores, 0.6) == 0.6
+        assert optimize(scores, 0.7) == 0.7
+        assert optimize(scores, 0.9) == 0.7

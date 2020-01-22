@@ -5,7 +5,7 @@ from typing import Any, Dict, List, Tuple
 import numpy as np
 import pandas as pd
 
-from app.TopicInfo import TopicInfo
+from app.topic_info import TopicInfo
 
 
 def compute_precision(true_pos: float, false_pos: float) -> float:
@@ -50,7 +50,7 @@ def build_score_matrix(train_probs: List[float],
     return matrix.round(2).set_index('threshold')
 
 
-def optimize_threshold(scores: pd.DataFrame, min_prec: float = 0.3) -> Any:
+def optimize(scores: pd.DataFrame, min_prec: float = 0.3) -> Any:
     scores = scores[scores.precision >= min_prec]
     # if minimum precision is not achived return default threshold
     if len(scores) == 0:
@@ -64,8 +64,8 @@ def optimize_threshold(scores: pd.DataFrame, min_prec: float = 0.3) -> Any:
     return thresholds[0]
 
 
-def ComputeThresholds(topic: str, train_probs: List[float],
-                      false_probs: List[float]) -> TopicInfo:
+def compute(topic: str, train_probs: List[float],
+            false_probs: List[float]) -> TopicInfo:
 
     ti = TopicInfo(topic)
     ti.num_samples = len(train_probs)
@@ -81,13 +81,13 @@ def ComputeThresholds(topic: str, train_probs: List[float],
 
     # else optimize threshold based on scores
     scores = build_score_matrix(train_probs, false_probs)
-    threshold = optimize_threshold(scores)
+    threshold = optimize(scores)
     ti.scores = scores
     ti.suggested_threshold = threshold
     return ti
 
 
-def save_thresholds(topic_infos: Dict[str, TopicInfo], path: str) -> None:
+def save(topic_infos: Dict[str, TopicInfo], path: str) -> None:
     with open(path, 'w') as f:
         f.write(
             json.dumps({t: v.to_json_dict()

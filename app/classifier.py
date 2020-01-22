@@ -13,12 +13,12 @@ from flask import Blueprint
 from flask import current_app as app
 from flask import jsonify, request
 
+import app.thresholds as thresholds
 from app import tasks
 from app.embedder import MAX_SEQ_LENGTH, Embedder
 from app.model_config import InstanceConfig
 from app.models import ClassificationSample, hasher, session, sessionLock
-from app.threshold_optimization import ComputeThresholds, save_thresholds
-from app.TopicInfo import TopicInfo
+from app.topic_info import TopicInfo
 
 classify_bp = Blueprint('classify_bp', __name__)
 
@@ -198,7 +198,7 @@ class Classifier:
                 train_probs.append(sample_prob)
             else:
                 false_probs.append(sample_prob)
-        return ComputeThresholds(topic, train_probs, false_probs)
+        return thresholds.compute(topic, train_probs, false_probs)
 
     def _quality_at_precision(self, precision: int,
                               sample_quality: List[Dict[str, float]],
@@ -262,7 +262,7 @@ class Classifier:
             self.topic_infos[ti.topic] = ti
 
         path_to_thresholds = os.path.join(self.instance_dir, 'thresholds.json')
-        save_thresholds(self.topic_infos, path_to_thresholds)
+        thresholds.save(self.topic_infos, path_to_thresholds)
 
     @staticmethod
     def quality_to_predicted_labels(sample_probs: Dict[str, float]
