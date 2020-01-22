@@ -14,7 +14,6 @@ def create_app() -> Flask:
 
     # hard-code some configuration
     app.config['BASE_CLASSIFIER_DIR'] = './classifier_models'
-    app.config['DESIRED_CLASSIFIER_PRECISION'] = 30
     for k, v in app.config.items():
         app.logger.debug('%s: %s' % (k, v))
 
