@@ -81,10 +81,7 @@ class ModelStatus:
             }
         preferred = self.get_preferred_model_instance()
         topics = {}
-        quality_at_precision = {}
         if self.classifier:
-            quality_at_precision = self.classifier.quality_infos.get(
-                app.config['DESIRED_CLASSIFIER_PRECISION'], {})
             for t, ti in self.classifier.topic_infos.items():
                 topics[t] = {
                     'name': t,
