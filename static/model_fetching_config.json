@@ -11,6 +11,9 @@
     "multilabel/{model}/saved_model/{instance}/*.csv",
     "multilabel/{model}/saved_model/*.vocab"
   ],
-  "source_dirs": ["multilabel/{model}/saved_model/{instance}/variables"],
+  "source_dirs": [
+      "multilabel/{model}/saved_model/{instance}/variables",
+      "multilabel/{model}/data"
+  ],
   "dest_dir": "classifier_models/{model}/{instance}"
 }
