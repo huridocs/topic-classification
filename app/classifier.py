@@ -261,6 +261,10 @@ class Classifier:
             self.logger.info(str(ti))
             self.topic_infos[ti.topic] = ti
 
+        path_to_evaluation = os.path.join(self.instance_dir, 'evaluation.csv')
+        evaluation = thresholds.evaluate(self.topic_infos)
+        evaluation.to_csv(path_to_evaluation)
+
         path_to_thresholds = os.path.join(self.instance_dir, 'thresholds.json')
         thresholds.save(self.topic_infos, path_to_thresholds)
 
