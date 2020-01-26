@@ -1,6 +1,7 @@
 import json
 import math
-from typing import Any, Dict, List, Tuple
+from collections import Counter
+from typing import Any, Dict, List, Set, Tuple
 
 import numpy as np
 import pandas as pd
@@ -101,6 +102,15 @@ def evaluate(topic_infos: Dict[str, TopicInfo]) -> pd.DataFrame:
     return evaluation
 
 
+def topics_above_threshold(topic_infos: Dict[str, TopicInfo],
+                           probabilities: Dict[str, float]) -> Set[str]:
+    predicted_topics = []
+    for topic, info in topic_infos.items():
+        if probabilities.get(topic, 0.0) >= info.suggested_threshold:
+            predicted_topics.append(topic)
+    return set(predicted_topics)
+
+
 def save(topic_infos: Dict[str, TopicInfo], path: str) -> None:
     with open(path, 'w') as f:
         f.write(
@@ -108,3 +118,37 @@ def save(topic_infos: Dict[str, TopicInfo], path: str) -> None:
                         for t, v in topic_infos.items()},
                        indent=4,
                        sort_keys=True))
+
+
+def quality(topic_infos: Dict[str, TopicInfo],
+            sample_probs: List[Dict[str, float]],
+            train_labels: List[Set[str]]
+            ) -> Dict[str, Any]:
+    num_complete = 0.0
+    sum_extra = 0.0
+    missing_topics: Counter = Counter()
+    for i, probs in enumerate(sample_probs):
+        pred_topics = topics_above_threshold(topic_infos, probs)
+        train_topics = train_labels[i]
+
+        correct_predictions = train_topics.intersection(pred_topics)
+
+        if len(correct_predictions) >= len(train_topics):
+            num_complete += 1
+
+        sum_extra += len(pred_topics) - len(correct_predictions)
+
+        missed_topics = train_topics.difference(pred_topics)
+        for topic in missed_topics:
+            missing_topics[topic] += 1
+
+    completeness = num_complete / len(train_labels) * 100
+    extra = sum_extra / len(train_labels)
+    top_missing_topics = {k: (float(v)/len(train_labels)*100)
+                          for (k, v) in missing_topics.most_common(10)}
+    quality = {
+            'completeness': completeness,
+            'extra': extra,
+            'missing': top_missing_topics
+    }
+    return quality

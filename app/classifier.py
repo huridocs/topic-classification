@@ -3,9 +3,8 @@ import json
 import logging
 import os
 import threading
-from collections import Counter
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 
 import numpy as np
 import tensorflow as tf
@@ -200,31 +199,6 @@ class Classifier:
                 false_probs.append(sample_prob)
         return thresholds.compute(topic, train_probs, false_probs)
 
-    def _quality_at_precision(self, precision: int,
-                              sample_quality: List[Dict[str, float]],
-                              train_labels: List[Set[str]]
-                              ) -> Tuple[int, float, float, Counter]:
-        num_complete = 0.0
-        sum_extra = 0.0
-        missing_topics: Counter = Counter()
-        for i, sample_trains in enumerate(train_labels):
-            num_found = 0
-            for train_topic in sample_trains:
-                sample_qual = sample_quality[i].get(train_topic, 0.0)
-                if sample_qual >= precision / 100.0:
-                    num_found += 1
-                else:
-                    missing_topics[train_topic] += 1
-            if num_found >= len(sample_trains):
-                num_complete += 1
-            sum_extra += len([
-                q for q in sample_quality[i].values() if q >= precision / 100.0
-            ]) - num_found
-
-        completeness = num_complete / len(train_labels) * 100
-        extra = sum_extra / len(train_labels)
-        return (precision, completeness, extra, missing_topics)
-
     def refresh_thresholds(self,
                            limit: int = 2000,
                            subset_file: Optional[str] = None) -> None:
@@ -260,6 +234,14 @@ class Classifier:
         ]:
             self.logger.info(str(ti))
             self.topic_infos[ti.topic] = ti
+
+        quality = thresholds.quality(self.topic_infos,
+                                     sample_probs,
+                                     train_labels)
+
+        path_to_quality = os.path.join(self.instance_dir, 'quality.json')
+        with open(path_to_quality, 'w') as f:
+            f.write(json.dumps(quality, indent=4, sort_keys=True))
 
         path_to_evaluation = os.path.join(self.instance_dir, 'evaluation.csv')
         evaluation = thresholds.evaluate(self.topic_infos)
