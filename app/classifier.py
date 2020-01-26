@@ -237,8 +237,7 @@ class Classifier:
             self.logger.info(str(ti))
             self.topic_infos[ti.topic] = ti
 
-        quality = thresholds.quality(self.topic_infos,
-                                     sample_probs,
+        quality = thresholds.quality(self.topic_infos, sample_probs,
                                      train_labels)
 
         path_to_quality = os.path.join(self.instance_dir, 'quality.json')

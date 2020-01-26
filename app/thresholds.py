@@ -122,8 +122,7 @@ def save(topic_infos: Dict[str, TopicInfo], path: str) -> None:
 
 def quality(topic_infos: Dict[str, TopicInfo],
             sample_probs: List[Dict[str, float]],
-            train_labels: List[Set[str]]
-            ) -> Dict[str, Any]:
+            train_labels: List[Set[str]]) -> Dict[str, Any]:
     num_complete = 0.0
     sum_extra = 0.0
     missing_topics: Counter = Counter()
@@ -144,11 +143,13 @@ def quality(topic_infos: Dict[str, TopicInfo],
 
     completeness = num_complete / len(train_labels) * 100
     extra = sum_extra / len(train_labels)
-    top_missing_topics = {k: (float(v)/len(train_labels)*100)
-                          for (k, v) in missing_topics.most_common(10)}
+    top_missing_topics = {
+        k: (float(v) / len(train_labels) * 100)
+        for (k, v) in missing_topics.most_common(10)
+    }
     quality = {
-            'completeness': completeness,
-            'extra': extra,
-            'missing': top_missing_topics
+        'completeness': completeness,
+        'extra': extra,
+        'missing': top_missing_topics
     }
     return quality
