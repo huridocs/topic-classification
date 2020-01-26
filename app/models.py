@@ -5,8 +5,11 @@ from os import environ
 from typing import Any, Dict
 
 import bson
+from dotenv import load_dotenv
 from ming import create_datastore, schema
 from ming.odm import FieldProperty, MappedClass, Mapper, ODMSession
+
+load_dotenv()
 
 DBHOST = environ[
     'DBHOST'] if 'DBHOST' in environ else 'mongodb://localhost:27017'
@@ -72,7 +75,7 @@ class ClassificationSample(MappedClass, JsonOdmHelper):
     class __mongometa__:
         session = session
         name = 'classification_sample'
-        indexes = [('model',)]
+        indexes = [('model',), ('sharedId',)]
         unique_indexes = [('model', 'seqHash')]
 
     _id = FieldProperty(schema.ObjectId)

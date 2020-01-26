@@ -129,8 +129,10 @@ class Classifier:
         # Split very large requests into chunks since
         # (intermediate) bert data is huge.
         if len(seqs) > batch_size:
-            return (self._classify_probs(seqs[:batch_size]) +
-                    self._classify_probs(seqs[batch_size:]))
+            result: List[Dict[str, float]] = []
+            for i in range(0, len(seqs), batch_size):
+                result += self._classify_probs(seqs[i:i + batch_size])
+            return result
 
         embeddings = self.embedder.get_embedding(seqs)
         embedding_shape = embeddings[0].shape
@@ -257,7 +259,8 @@ class Classifier:
             [dict(topic=t, quality=q) for t, q in sample_probs.items()],
             key=lambda o: -o['quality'])
 
-    def refresh_predictions(self, limit: int = 2000) -> None:
+    def refresh_predictions(self, limit: int = 2000,
+                            batch_size: int = 1000) -> None:
         with sessionLock:
             samples: List[ClassificationSample] = list(
                 ClassificationSample.query.find(
@@ -265,13 +268,25 @@ class Classifier:
                                                        ]).limit(limit))
             seqs = [s.seq for s in samples]
 
-        sample_probs = self.classify(seqs)
+        for i in range(0, len(seqs), batch_size):
+            sample_probs = self.classify(seqs[i:i + batch_size])
 
-        with sessionLock:
-            for i, sample in enumerate(samples):
-                sample.predicted_labels = (
-                    Classifier.quality_to_predicted_labels(sample_probs[i]))
-            session.flush()
+            with sessionLock:
+                for i, seq in enumerate(seqs[i:i + batch_size]):
+                    sample: ClassificationSample = (
+                        ClassificationSample.query.get(model=self.model_name,
+                                                       seqHash=hasher(seq)))
+                    if sample:
+                        sample.predicted_labels = (
+                            Classifier.quality_to_predicted_labels(
+                                sample_probs[i]))
+                    else:
+                        print('ERROR: lost sample')
+                session.flush()
+                # This is harsh, but it seems otherwise some cache builds up
+                # inside ming and eventually OOM's the application...
+                # Thankfully, due to sessionLock this should be safe.
+                session.clear()
 
 
 class ClassifierCache:
@@ -349,6 +364,11 @@ class _RefreshPredictionsTask(tasks.TaskProvider):
 tasks.providers['RefreshPredictions'] = _RefreshPredictionsTask
 
 
+@classify_bp.route('/clear_cache', methods=['PUT'])
+def clear_cache() -> Any:
+    ClassifierCache.clear_all()
+
+
 @classify_bp.route('/classify', methods=['POST'])
 def classify() -> Any:
     # request.args: &model=upr-info_issues[&probs]
@@ -370,10 +390,12 @@ def classify() -> Any:
 def add_samples() -> Any:
     # request.args: &model=upr-info_issues
     # request.get_json: {'samples': [{'seq': "hello world',
+    #                                 'sharedId': 'asda12',
     #                                 'training_labels'?: [
     #                                     {'topic':"Murder},
     #                                     {'topic': 'Justice'}]},
-    #                                ...] }
+    #                                ...],
+    #                    'refresh_predictions': true }
     # returns {'samples': [{'seq': "hello world", "predicted_labels": [...]}]}
     data = request.get_json()
     args = request.args
@@ -386,6 +408,9 @@ def add_samples() -> Any:
 
     c = ClassifierCache.get(app.config['BASE_CLASSIFIER_DIR'], args['model'])
 
+    refresh_predictions = (data['refresh_predictions']
+                           if 'refresh_predictions' in data else False)
+
     for i, sample in enumerate(data['samples']):
         seqHash = hasher(sample['seq'])
 
@@ -394,28 +419,37 @@ def add_samples() -> Any:
                 model=args['model'], seqHash=seqHash)
             sample_labels = (sample['training_labels']
                              if 'training_labels' in sample else [])
+            sharedId = (sample['sharedId'] if 'sharedId' in sample else '')
             if existing:
                 response_sample = existing
                 if 'training_labels' in sample:
                     existing.training_labels = sample_labels
                     existing.use_for_training = len(sample_labels) > 0
+                if 'sharedId' in sample:
+                    existing.sharedId = sharedId
             elif seqHash not in processed:
                 response_sample = ClassificationSample(
                     model=args['model'],
                     seq=sample['seq'],
                     seqHash=seqHash,
                     training_labels=sample_labels,
+                    sharedId=sharedId,
                     use_for_training=len(sample_labels) > 0)
+            session.flush()
         processed.add(seqHash)
         if response_sample:
-            if not response_sample.predicted_labels:
+            if not response_sample.predicted_labels or refresh_predictions:
                 predicted_labels = (Classifier.quality_to_predicted_labels(
                     c.classify([sample['seq']])[0]))
                 with sessionLock:
                     response_sample.predicted_labels = predicted_labels
+                    session.flush()
+
             response.append(
                 dict(seq=sample['seq'],
                      predicted_labels=response_sample.predicted_labels))
+        with sessionLock:
+            session.clear()
     return jsonify(dict(samples=response))
 
 
