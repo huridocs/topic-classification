@@ -51,11 +51,24 @@ def build_score_matrix(train_probs: List[float],
     return matrix.round(2).set_index('threshold')
 
 
-def optimize(scores: pd.DataFrame, min_prec: float = 0.3) -> Any:
-    scores = scores[scores.precision >= min_prec]
+def optimize(scores: pd.DataFrame, min_prec: float = 0.3,
+             min_rec: float = 0.85) -> Any:
+    org_scores = scores.copy(deep=True)
+    scores = scores[(scores.precision >= min_prec) & (scores.recall >= min_rec)]
     # if minimum precision is not achived return default threshold
     if len(scores) == 0:
-        return 0.5
+        scores = org_scores[org_scores.precision >= min_prec]
+
+        if len(scores) == 0:
+            print('No scores with minimum precision are found'
+                  ': default threshold is used')
+            return 0.5
+
+        print('No scores with minimum recall and precision are found'
+              ': optimize recall with minimum precision')
+        max_rec = scores.recall.max()
+        return scores[scores.recall == max_rec].index[-1]
+
     max_f1 = scores.f1.max()
     thresholds = scores[scores.f1 == max_f1].index
     # if at multiple thresholds the max f1 is reached select central index
@@ -71,8 +84,10 @@ def compute(topic: str, train_probs: List[float],
     ti = TopicInfo(topic)
     ti.num_samples = len(train_probs)
 
+    print(topic)
     # use default threshold if too less samples are provided
     if ti.num_samples < 10:
+        print('Not enough samples -> default threshold is used')
         f1, precision, recall = compute_scores(train_probs, false_probs,
                                                ti.suggested_threshold)
         ti.scores = pd.DataFrame([(f1, precision, recall)],

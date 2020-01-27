@@ -58,13 +58,14 @@ class TestThresholds:
                               index=[0.2, 0.4, 0.7])
         assert optimize(scores) == 0.7
         assert optimize(scores, min_prec=0.8) == 0.4
+        assert optimize(scores, min_prec=0.8, min_rec=0.5) == 0.4
         # if minimum precision cannot be achieved return default threshold
         assert optimize(scores, min_prec=1.1) == 0.5
 
     def test_optimize__multimax(self) -> None:
-        scores = pd.DataFrame([(0.7, 0.3, 0.9), (0.7, 0.6, 0.7),
-                               (0.7, 0.4, 0.8), (0.7, 0.7, 0.7),
-                               (0.7, 0.9, 0.5)],
+        scores = pd.DataFrame([(0.7, 0.3, 0.9), (0.7, 0.6, 0.85),
+                               (0.7, 0.4, 0.87), (0.7, 0.7, 0.85),
+                               (0.7, 0.9, 0.85)],
                               columns=['f1', 'precision', 'recall'],
                               index=[0.3, 0.4, 0.5, 0.6, 0.7])
         assert optimize(scores) == 0.5
