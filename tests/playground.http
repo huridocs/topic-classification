@@ -119,3 +119,10 @@ content-type: application/json
 GET http://localhost:5005/models?model=UPR_2percent_ps0 HTTP/1.1
 content-type: application/json
 
+### Uwazi
+PUT http://localhost:5005/sync_uwazi HTTP/1.1
+content-type: application/json
+
+{
+    "uwazi_url": "http://localhost:3000"
+}
