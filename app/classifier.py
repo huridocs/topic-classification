@@ -141,6 +141,8 @@ class Classifier:
         all_input_mask = np.zeros([len(embeddings), MAX_SEQ_LENGTH])
 
         for i, matrix in enumerate(embeddings):
+            if matrix is None:
+                raise Exception('duplicate sequences are not supported.')
             all_embeddings[i][:len(matrix)] = matrix
             all_input_mask[i][:len(matrix)] = 1
 
@@ -410,15 +412,38 @@ def add_samples() -> Any:
     refresh_predictions = (data['refresh_predictions']
                            if 'refresh_predictions' in data else False)
 
+    seq_hash_to_seq_index: Dict[str, int] = {}
+    seqs_to_classify: List[str] = []
+
     for i, sample in enumerate(data['samples']):
+        if not sample['seq']:
+            continue
         seqHash = hasher(sample['seq'])
+        if seqHash in seq_hash_to_seq_index:
+            continue
+        with sessionLock:
+            existing1: ClassificationSample = ClassificationSample.query.get(
+                model=args['model'], seqHash=seqHash)
+            if (refresh_predictions or not existing1 or
+                    not existing1.predicted_labels):
+                seqs_to_classify.append(sample['seq'])
+                seq_hash_to_seq_index[seqHash] = len(seqs_to_classify) - 1
+
+    classified_seqs: List[Dict[str, float]]
+    if seqs_to_classify:
+        classified_seqs = c.classify(seqs_to_classify)
+
+    for i, sample in enumerate(data['samples']):
+        if not sample['seq']:
+            continue
+        seqHash = hasher(sample['seq'])
+        sharedId = (sample['sharedId'] if 'sharedId' in sample else '')
+        sample_labels = (sample['training_labels']
+                         if 'training_labels' in sample else [])
 
         with sessionLock:
             existing: ClassificationSample = ClassificationSample.query.get(
                 model=args['model'], seqHash=seqHash)
-            sample_labels = (sample['training_labels']
-                             if 'training_labels' in sample else [])
-            sharedId = (sample['sharedId'] if 'sharedId' in sample else '')
             if existing:
                 response_sample = existing
                 if 'training_labels' in sample:
@@ -439,16 +464,17 @@ def add_samples() -> Any:
         if response_sample:
             if not response_sample.predicted_labels or refresh_predictions:
                 predicted_labels = (Classifier.quality_to_predicted_labels(
-                    c.classify([sample['seq']])[0]))
+                    classified_seqs[seq_hash_to_seq_index[seqHash]]))
                 with sessionLock:
                     response_sample.predicted_labels = predicted_labels
                     session.flush()
 
             response.append(
-                dict(seq=sample['seq'],
+                dict(seq='' if sharedId else sample['seq'],
+                     sharedId=sharedId,
                      predicted_labels=response_sample.predicted_labels))
-        with sessionLock:
-            session.clear()
+    with sessionLock:
+        session.clear()
     return jsonify(dict(samples=response))
 
 
