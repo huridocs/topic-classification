@@ -92,7 +92,7 @@ def compute(topic: str, train_probs: List[float],
                                                ti.suggested_threshold)
         ti.scores = pd.DataFrame([(f1, precision, recall)],
                                  columns=['f1', 'precision', 'recall'],
-                                 index=[ti.suggested_threshold])
+                                 index=[ti.suggested_threshold]).round(2)
         return ti
 
     # else optimize threshold based on scores

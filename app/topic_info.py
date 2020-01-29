@@ -27,13 +27,17 @@ class TopicInfo:
     def get_quality(self) -> Any:
         return self.scores.loc[self.suggested_threshold].f1
 
+    def closest_threshold(self, value: float) -> float:
+        thres = self.scores.index.tolist()
+        ind, value = min(enumerate(thres), key=lambda x: abs(x[1] - value))
+        return value
+
     def get_confidence_at_probability(self, prob: float) -> Any:
         # TODO: include distance between threshold and probability
-        scores = self.scores[self.scores.index >= prob]
-        if len(scores) > 0:
-            quality = scores.iloc[0].f1
-            return quality
-        return 0.5
+        if self.scores.empty:
+            return 0.5
+        closest_thres = self.closest_threshold(prob)
+        return self.scores.loc[closest_thres].precision
 
     def __str__(self) -> str:
         res = [
