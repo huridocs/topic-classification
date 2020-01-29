@@ -412,13 +412,13 @@ def add_samples() -> Any:
 
     for i, sample in enumerate(data['samples']):
         seqHash = hasher(sample['seq'])
+        sharedId = (sample['sharedId'] if 'sharedId' in sample else '')
+        sample_labels = (sample['training_labels']
+                         if 'training_labels' in sample else [])
 
         with sessionLock:
             existing: ClassificationSample = ClassificationSample.query.get(
                 model=args['model'], seqHash=seqHash)
-            sample_labels = (sample['training_labels']
-                             if 'training_labels' in sample else [])
-            sharedId = (sample['sharedId'] if 'sharedId' in sample else '')
             if existing:
                 response_sample = existing
                 if 'training_labels' in sample:
@@ -445,7 +445,8 @@ def add_samples() -> Any:
                     session.flush()
 
             response.append(
-                dict(seq=sample['seq'],
+                dict(seq='' if sharedId else sample['seq'],
+                     sharedId=sharedId,
                      predicted_labels=response_sample.predicted_labels))
         with sessionLock:
             session.clear()
