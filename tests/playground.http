@@ -112,10 +112,15 @@ content-type: application/json
 }
 
 ### Model Status
-GET http://localhost:5005/models HTTP/1.1
+GET http://localhost:5005/models/list HTTP/1.1
 content-type: application/json
 
+### Model Status with Filter
+GET http://localhost:5005/models/list?filter=upr-info-issues HTTP/1.1
+content-type: application/json
+
+
 ### Model Instances
-GET http://localhost:5005/models?model=UPR_2percent_ps0 HTTP/1.1
+GET http://localhost:5005/models?model=upr-info-issues HTTP/1.1
 content-type: application/json
 

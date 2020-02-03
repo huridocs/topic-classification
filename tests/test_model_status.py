@@ -16,6 +16,11 @@ class TestModelStatus:
             './testdata/test_other_model/test_instance_unreleased')
         s = ModelStatus(self.BASE_CLASSIFIER_PATH)
 
+        # with a filter
+        result = s.list_potential_models(filter_str='^test_other')
+        assert result == ['test_other_model']
+
+        # all models
         result = s.list_potential_models()
         assert result == ['test_model', 'test_other_model']
 
@@ -24,6 +29,7 @@ class TestModelStatus:
         fs.add_real_directory(path.join(self.BASE_CLASSIFIER_PATH, model))
         s = ModelStatus(self.BASE_CLASSIFIER_PATH, model_name=model)
 
+        # all
         result = s.list_model_instances()
         assert result == [
             'test_instance', 'test_instance_missing_model',
