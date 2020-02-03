@@ -1,6 +1,7 @@
 import logging
 import os
-from typing import Any, Dict, List
+import re
+from typing import Any, Dict, List, Optional
 
 from flask import Blueprint
 from flask import current_app as app
@@ -23,7 +24,7 @@ class ModelStatus:
         self.logger = logging.getLogger()
         self.base_classifier_dir = base_classifier_dir
         self.model_name = model_name
-        self.classifier = None
+        self.classifier: Optional[Classifier] = None
         if self.model_name:
             try:
                 self.classifier = Classifier(self.base_classifier_dir,
@@ -36,8 +37,12 @@ class ModelStatus:
                     'No model %s found in classifier directory=%s' %
                     (model_name, self.base_classifier_dir))
 
-    def list_potential_models(self) -> List[str]:
-        return sorted(os.listdir(self.base_classifier_dir))
+    def list_potential_models(self, filter_str: str = '.*') -> List[str]:
+        filter_exp = re.compile(filter_str)
+        return sorted([
+            model for model in os.listdir(self.base_classifier_dir)
+            if filter_exp.match(model)
+        ])
 
     def list_model_instances(self) -> List[str]:
         try:
@@ -52,7 +57,8 @@ class ModelStatus:
         if not self.classifier:
             return ''
         try:
-            return self.classifier.instance if self.model_name else ''
+            if self.classifier is not None:
+                return self.classifier.instance if self.model_name else ''
         except Exception:
             self.logger.info('No preferred instance found for model %s' %
                              self.model_name)
@@ -62,8 +68,9 @@ class ModelStatus:
         if not self.classifier:
             return ''
         try:
-            return self.classifier.instance_config.bert if (
-                self.model_name) else ''
+            if self.classifier is not None:
+                return self.classifier.instance_config.bert if (
+                    self.model_name) else ''
         except Exception:
             self.logger.info(
                 'No preferred instance with BERT specified found for model %s' %
@@ -73,14 +80,14 @@ class ModelStatus:
     def _build_status_dict(self) -> Dict[str, Any]:
         bert = self.get_bert()
         instances = self.list_model_instances()
-        if not instances:
+        if not instances or self.classifier is None:
             return {
                 'name': self.model_name,
                 'error': 'Invalid model name %s' % self.model_name
             }
         preferred = self.get_preferred_model_instance()
         topics = {}
-        quality_at_precision = {}
+        quality_at_precision: Dict[str, Any] = {}
         if self.classifier:
             quality_at_precision = self.classifier.quality_infos.get(
                 app.config['DESIRED_CLASSIFIER_PRECISION'], {})
@@ -106,7 +113,7 @@ class ModelStatus:
 
 
 @model_status_bp.route('/models', methods=['GET'])
-def getModels() -> Any:
+def getModel() -> Any:
     # request.get_json: {
     #     'model': 'UPR_2percent_ps0'
     # }
@@ -131,3 +138,17 @@ def getModels() -> Any:
         status = ModelStatus(app.config['BASE_CLASSIFIER_DIR'], model_name=m)
         results[m] = status._build_status_dict()
     return jsonify(results)
+
+
+@model_status_bp.route('/models/list', methods=['GET'])
+def listModels() -> Any:
+    # request.get_json: {
+    #     'filter': 'upr-topics'
+    # }
+    args = request.args
+
+    model_filter = args.get('filter', default='.*')
+
+    status = ModelStatus(app.config['BASE_CLASSIFIER_DIR'])
+    models = status.list_potential_models(model_filter)
+    return jsonify(models=models)
