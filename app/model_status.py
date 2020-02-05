@@ -80,8 +80,10 @@ class ModelStatus:
                 'error': 'Invalid model name %s' % self.model_name
             }
         preferred = self.get_preferred_model_instance()
+        completeness = 0.0
         topics = {}
         if self.classifier:
+            completeness = self.classifier.quality_info['completeness']
             for t, ti in self.classifier.topic_infos.items():
                 topics[t] = {
                     'name': t,
@@ -92,6 +94,7 @@ class ModelStatus:
             'name': self.model_name,
             'instances': instances,
             'preferred': preferred,
+            'completeness': completeness,
             'bert': bert,
             'topics': topics
         }

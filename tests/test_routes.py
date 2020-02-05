@@ -62,6 +62,7 @@ def test_all_model_status(app: Flask, fs: FakeFilesystem) -> None:
         'test_instance', 'test_instance_unreleased'
     ]
     assert result['test_model']['preferred'] == 'test_instance'
+    assert result['test_model']['completeness'] >= 0.9
     # Pick random test topics to assert
     assert result['test_model']['topics']['Poverty'] == {
         'name': 'Poverty',

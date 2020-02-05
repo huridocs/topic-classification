@@ -41,6 +41,7 @@ class Classifier:
         self.model_name = model_name
         self.model_config_path = os.path.join(base_classifier_dir, model_name)
         self.topic_infos: Dict[str, TopicInfo] = {}
+        self.quality_info: Dict[str, Any] = {}
         self._load_instance_config()
 
     def _load_instance_config(self) -> None:
@@ -59,6 +60,7 @@ class Classifier:
                                                      self.instance)
                     self._init_vocab()
                     self._init_thresholds()
+                    self._init_quality()
                     self._init_embedding()
                     self._init_predictor()
                     return
@@ -121,6 +123,23 @@ class Classifier:
             raise Exception(
                 'Failure to load thresholds file from %s with exception: %s' %
                 (path_to_thresholds, e))
+
+    def _init_quality(self) -> None:
+        path_to_quality = os.path.join(self.instance_dir, 'quality.json')
+        try:
+            if not os.path.exists(path_to_quality):
+                self.logger.warning(
+                    ('The model at %s does not have quality, ' +
+                     'consider ./run local --mode thresholds --model %s') %
+                    (self.instance_dir, self.model_name))
+            else:
+                with open(path_to_quality, 'r') as f:
+                    for k, v in json.load(f).items():
+                        self.quality_info[k] = v
+        except Exception as e:
+            raise Exception(
+                'Failure to load quality file from %s with exception %s' %
+                (path_to_quality, e))
 
     def _classify_probs(self, seqs: List[str],
                         batch_size: int = 1000) -> List[Dict[str, float]]:
