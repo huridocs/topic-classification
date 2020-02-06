@@ -139,14 +139,18 @@ def quality(topic_infos: Dict[str, TopicInfo],
             sample_probs: List[Dict[str, float]],
             train_labels: List[Set[str]]) -> Dict[str, Any]:
     num_complete = 0.0
+    num_with_prediction = 0.0
     sum_extra = 0.0
     missing_topics: Counter = Counter()
+    extra_topics: Counter = Counter()
     for i, probs in enumerate(sample_probs):
         pred_topics = topics_above_threshold(topic_infos, probs)
         train_topics = train_labels[i]
 
         correct_predictions = train_topics.intersection(pred_topics)
 
+        if len(pred_topics) > 0:
+            num_with_prediction += 1
         if len(correct_predictions) >= len(train_topics):
             num_complete += 1
 
@@ -156,15 +160,28 @@ def quality(topic_infos: Dict[str, TopicInfo],
         for topic in missed_topics:
             missing_topics[topic] += 1
 
+        bad_topics = pred_topics.difference(train_topics)
+        for topic in bad_topics:
+            extra_topics[topic] += 1
+
     completeness = num_complete / len(train_labels) * 100
+    prediction_ratio = num_with_prediction / len(train_labels) * 100
+    completeness_among_prediction = num_complete / num_with_prediction * 100
     extra = sum_extra / len(train_labels)
     top_missing_topics = {
         k: (float(v) / len(train_labels) * 100)
         for (k, v) in missing_topics.most_common(10)
     }
+    top_extra_topics = {
+        k: (float(v) / len(train_labels) * 100)
+        for (k, v) in extra_topics.most_common(10)
+    }
     quality = {
         'completeness': completeness,
+        'prediction_ratio': prediction_ratio,
+        'completeness_among_prediction': completeness_among_prediction,
         'extra': extra,
-        'missing': top_missing_topics
+        'missing': top_missing_topics,
+        'bad': top_extra_topics
     }
     return quality
