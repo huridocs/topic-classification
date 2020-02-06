@@ -77,6 +77,43 @@ def test_all_model_status(app: Flask, fs: FakeFilesystem) -> None:
     }
 
 
+def test_list_models(app: Flask, fs: FakeFilesystem) -> None:
+    fs.add_real_directory('./testdata/test_model/test_instance')
+    fs.add_real_directory('./testdata/test_model/test_instance_unreleased')
+    fs.add_real_directory('./testdata/test_other_model/test_instance')
+
+    client = app.test_client()
+
+    with app.test_request_context():
+        resp = client.get('/models/list', content_type='application/json')
+    assert resp.status == '200 OK'
+
+    result = json.loads(resp.data)
+
+    assert result
+    assert len(result.keys()) == 1
+    assert set(result['models']) == set(['test_model', 'test_other_model'])
+
+
+def test_list_models_filtered(app: Flask, fs: FakeFilesystem) -> None:
+    fs.add_real_directory('./testdata/test_model/test_instance')
+    fs.add_real_directory('./testdata/test_model/test_instance_unreleased')
+    fs.add_real_directory('./testdata/test_other_model/test_instance')
+
+    client = app.test_client()
+
+    with app.test_request_context():
+        resp = client.get('/models/list?filter=test_other',
+                          content_type='application/json')
+    assert resp.status == '200 OK'
+
+    result = json.loads(resp.data)
+
+    assert result
+    assert len(result.keys()) == 1
+    assert set(result['models']) == set(['test_other_model'])
+
+
 def test_model_status(app: Flask, fs: FakeFilesystem) -> None:
     fs.add_real_directory('./testdata/test_model/test_instance')
     fs.add_real_directory('./testdata/test_model/test_instance_unreleased')
