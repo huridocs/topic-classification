@@ -14,7 +14,7 @@
       "type": "python",
       "request": "launch",
       "program": "${workspaceFolder}/local.py",
-      "args": ["--mode=classify", "--model=upr-info-issues"]
+      "args": ["--mode=sync", "--model=upr-info-issues"]
     },
     {
       "name": "test-this-file",

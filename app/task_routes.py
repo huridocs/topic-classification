@@ -18,9 +18,13 @@ def get_task() -> Any:
     return jsonify({'status': t.status})
 
 
-@task_bp.route('/task', methods=['POST'])
+@task_bp.route('/task', methods=['PUT'])
 def push_task() -> Any:
     data = request.get_json()
+    if 'remote_url' not in data:
+        data['remote_url'] = (
+            'http://%s:%d' %
+            (request.environ['REMOTE_ADDR'], request.environ['REMOTE_PORT']))
     if 'base_classifier_dir' not in data:
         data['base_classifier_dir'] = app.config['BASE_CLASSIFIER_DIR']
     p = tasks.GetProvider(data['provider'])

@@ -2,11 +2,12 @@
 
 import csv
 import os
+import time
 from typing import Any, Dict, List, Tuple
 
 from absl import app, flags
 
-from app import classifier, embedder, model_fetcher
+from app import classifier, embedder, model_fetcher, tasks, uwazi
 from app.models import ClassificationSample, hasher, session, sessionLock
 
 FLAGS = flags.FLAGS
@@ -41,10 +42,10 @@ flags.DEFINE_string(
     'If set, perform threshold learning only on samples which have a sequence '
     'containing one of the sequences in this csv file.')
 
-flags.DEFINE_enum(
-    'mode', 'classify',
-    ['embed', 'classify', 'prefetch', 'thresholds', 'predict', 'csv', 'import'],
-    'The operation to perform.')
+flags.DEFINE_enum('mode', 'classify', [
+    'embed', 'classify', 'prefetch', 'thresholds', 'predict', 'csv', 'import',
+    'sync'
+], 'The operation to perform.')
 
 flags.DEFINE_string(
     'csv', '',
@@ -174,6 +175,18 @@ def main(_: Any) -> None:
     elif FLAGS.mode == 'import':
         importData(FLAGS.csv, FLAGS.text_col, FLAGS.label_col,
                    FLAGS.sharedId_col)
+    elif FLAGS.mode == 'sync':
+        json = dict(uwazi_url='http://localhost:3000')
+        p = tasks.GetProvider('SyncPredictions')
+        if not p:
+            raise Exception('SyncPredictions not registered!')
+        t = tasks.GetOrCreateTask('local', p(json))
+        t.Start()
+        while not t.is_done.is_set():
+            time.sleep(0.3)
+            print(t.status)
+        print(t.status)
+
     return
 
 
