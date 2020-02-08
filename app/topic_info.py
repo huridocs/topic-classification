@@ -35,7 +35,7 @@ class TopicInfo:
     def get_confidence_at_probability(self, prob: float) -> Any:
         # TODO: include distance between threshold and probability
         if self.scores.empty:
-            return 0.5
+            return 0.3
         closest_thres = self.closest_threshold(prob)
         return self.scores.loc[closest_thres].precision
 

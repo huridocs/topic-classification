@@ -27,14 +27,14 @@ def test_e2e(app: Flask, fs: FakeFilesystem) -> None:
     fs.remove_object('./testdata/test_model/test_instance/quality.json')
     client = app.test_client()
     with app.test_request_context():
-        # without threshold file default quality is set to 0.5
+        # without threshold file default confidence is set to 0.3
         resp = client.post('/classify?model=test_model',
                            data=json.dumps({'seqs': [seq_pattern % 1]}),
                            content_type='application/json')
         assert resp.status == '200 OK'
         data = json.loads(resp.data)[0]
         assert len(data) == 1
-        assert data['Poverty'] == 0.5
+        assert data['Poverty'] == 0.3
 
         # now we add training labels and optimize the thresholds
         assert client.put('/classification_sample?model=test_model',
