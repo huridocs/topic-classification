@@ -104,16 +104,18 @@ def compute(topic: str, train_probs: List[float],
 
 
 def evaluate(topic_infos: Dict[str, TopicInfo]) -> pd.DataFrame:
-    evaluation = {}
+    measures: Dict[str, List[Any]] = {}
     for topic, info in topic_infos.items():
         metrics = info.scores.loc[info.suggested_threshold].tolist()
         metrics.append(info.suggested_threshold)
         metrics.append(info.num_samples)
-        evaluation.update({topic: metrics})
-    evaluation = pd.DataFrame.from_dict(
-        evaluation,
+        measures.update({topic: metrics})
+    evaluation: pd.DataFrame = pd.DataFrame.from_dict(
+        measures,
         orient='index',
         columns=['f1', 'precision', 'recall', 'threshold', 'num_samples'])
+    evaluation.drop('nan', inplace=True)
+    evaluation.loc['avg'] = evaluation.mean().round(2)
     return evaluation
 
 
