@@ -1,4 +1,3 @@
-import csv
 import json
 import logging
 import os
@@ -7,6 +6,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional, Set
 
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 from flask import Blueprint
 from flask import current_app as app
@@ -224,15 +224,12 @@ class Classifier:
 
     def refresh_thresholds(self,
                            limit: int = 2000,
-                           subset_file: Optional[str] = None) -> None:
+                           subset_file: Optional[str] = None,
+                           text_col: Optional[str] = 'text') -> None:
         subset_seqs: List[str] = []
         if subset_file:
-            with open(subset_file, 'r') as subset_handle:
-                subset_seqs = [
-                    row[0]
-                    for row in csv.reader(subset_handle, delimiter=',')
-                    if row
-                ]
+            subset_data = pd.read_csv(subset_file)
+            subset_seqs = subset_data[text_col].tolist()
         with sessionLock:
             samples: List[ClassificationSample] = list(
                 ClassificationSample.query.find(

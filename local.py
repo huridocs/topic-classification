@@ -80,7 +80,7 @@ def outputCsv(c: classifier.Classifier) -> None:
         with sessionLock:
             samples: List[ClassificationSample] = list(
                 ClassificationSample.query.find(
-                    dict(model=FLAGS.model, use_for_training=True)).sort([
+                    dict(model=FLAGS.model, use_for_training=False)).sort([
                         ('seqHash', -1)
                     ]).limit(FLAGS.limit))
             if FLAGS.csv:
@@ -159,7 +159,7 @@ def main(_: Any) -> None:
             print(c.classify([FLAGS.seq]))
     elif FLAGS.mode == 'thresholds':
         c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
-        c.refresh_thresholds(FLAGS.limit, FLAGS.subset_file)
+        c.refresh_thresholds(FLAGS.limit, FLAGS.subset_file, FLAGS.text_col)
     elif FLAGS.mode == 'predict':
         c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
         c.refresh_predictions(FLAGS.limit)
