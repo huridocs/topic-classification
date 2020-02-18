@@ -1,117 +1,25 @@
-import csv
 import json
 import logging
 import os
 import threading
-from collections import Counter
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set, Tuple
+from typing import Any, Dict, List, Optional, Set
 
 import numpy as np
+import pandas as pd
 import tensorflow as tf
 from flask import Blueprint
 from flask import current_app as app
 from flask import jsonify, request
 
+import app.thresholds as thresholds
 from app import tasks
 from app.embedder import MAX_SEQ_LENGTH, Embedder
 from app.model_config import InstanceConfig
 from app.models import ClassificationSample, hasher, session, sessionLock
+from app.topic_info import TopicInfo
 
 classify_bp = Blueprint('classify_bp', __name__)
-
-
-class TopicInfo:
-    """Collect thresholding and quality information about one topic."""
-
-    def __init__(self, topic: str):
-        self.topic = topic
-        self.num_samples = 0
-        self.thresholds: Dict[int, float] = {}
-        self.recalls: Dict[int, float] = {}
-        self.suggested_threshold = 1.1
-        self.f1_quality_at_suggested = 0.0
-        self.precision_at_suggested = 0.0
-
-    def to_json_dict(self) -> Dict[str, Any]:
-        return self.__dict__
-
-    def load_json_dict(self, v: Dict[str, Any]) -> None:
-        self.__dict__ = v
-        self.thresholds = {int(k): v for k, v in self.thresholds.items()}
-        self.recalls = {int(k): v for k, v in self.recalls.items()}
-
-    def get_quality(self, prob: float) -> float:
-        quality = 0.0
-        for precision_100, threshold in self.thresholds.items():
-            if prob >= threshold:
-                quality = precision_100 / 100.0
-        return quality
-
-    def __str__(self) -> str:
-        res = [
-            '%s has %d train, suggested quality %.02f@t=%.02f' %
-            (self.topic, self.num_samples, self.f1_quality_at_suggested,
-             self.suggested_threshold)
-        ]
-        for thres in self.thresholds.keys():
-            res.append(
-                '  t=%.02f -> %.02f@p%.01f' %
-                (self.thresholds[thres], self.recalls[thres], thres / 100.0))
-        return '\n'.join(res)
-
-
-def compute_precision(true_pos: float, false_pos: float) -> float:
-    if true_pos + false_pos > 0:
-        return true_pos / (true_pos + false_pos)
-    return 0.0
-
-
-def compute_recall(true_pos: float, train_probs: List[float]) -> float:
-    if len(train_probs) > 0:
-        return true_pos / len(train_probs)
-    return 0.0
-
-
-def compute_f1(precision: float, recall: float) -> float:
-    if precision + recall > 0:
-        return 2 * precision * recall / (precision + recall)
-    return 0.0
-
-
-def ComputeThresholds(topic: str, train_probs: List[float],
-                      false_probs: List[float]) -> TopicInfo:
-
-    ti = TopicInfo(topic)
-    ti.num_samples = len(train_probs)
-
-    # keep threshold in range with minimum 0.05 and maximum 0.95
-    for thres in np.arange(0.05, 1, 0.05):
-
-        true_pos = sum([1.0 for p in train_probs if p >= thres])
-        false_pos = sum([1.0 for p in false_probs if p >= thres])
-
-        precision = compute_precision(true_pos, false_pos)
-        recall = compute_recall(true_pos, train_probs)
-        f1 = compute_f1(precision, recall)
-
-        # Only increase suggested_threshold until precision hits 50%
-        if (precision >= 0.3 and f1 > ti.f1_quality_at_suggested and
-                ti.precision_at_suggested <= 0.3):
-            ti.precision_at_suggested = precision
-            ti.f1_quality_at_suggested = f1
-            ti.suggested_threshold = thres
-
-            # Choose default threshold for categories with too less samples
-            if ti.num_samples < 10:
-                return ti
-
-        for target in [20, 30, 40, 50, 60, 70, 80, 90]:
-            if (target not in ti.thresholds and precision >= target / 100.0):
-                ti.thresholds[target] = thres
-                ti.recalls[target] = recall
-
-    return ti
 
 
 class Classifier:
@@ -133,7 +41,7 @@ class Classifier:
         self.model_name = model_name
         self.model_config_path = os.path.join(base_classifier_dir, model_name)
         self.topic_infos: Dict[str, TopicInfo] = {}
-        self.quality_infos: Dict[str, Dict[str, Any]] = {}
+        self.quality_info: Dict[str, Any] = {}
         self._load_instance_config()
 
     def _load_instance_config(self) -> None:
@@ -227,10 +135,10 @@ class Classifier:
             else:
                 with open(path_to_quality, 'r') as f:
                     for k, v in json.load(f).items():
-                        self.quality_infos[k] = v
+                        self.quality_info[k] = v
         except Exception as e:
             raise Exception(
-                'Failure to load quality file from %s with exception: %s' %
+                'Failure to load quality file from %s with exception %s' %
                 (path_to_quality, e))
 
     def _classify_probs(self, seqs: List[str],
@@ -252,6 +160,8 @@ class Classifier:
         all_input_mask = np.zeros([len(embeddings), MAX_SEQ_LENGTH])
 
         for i, matrix in enumerate(embeddings):
+            if matrix is None:
+                raise Exception('duplicate sequences are not supported.')
             all_embeddings[i][:len(matrix)] = matrix
             all_input_mask[i][:len(matrix)] = 1
 
@@ -280,7 +190,7 @@ class Classifier:
         topic_quality: List[Dict[str, float]] = [{}] * len(topic_probs)
         for i in range(len(topic_probs)):
             topic_quality[i] = {
-                t: self.topic_infos[t].get_quality(p)
+                t: self.topic_infos[t].get_confidence_at_probability(p)
                 for t, p in topic_probs[i].items()
                 if p >= self.topic_infos[t].suggested_threshold
             }
@@ -310,44 +220,16 @@ class Classifier:
                 train_probs.append(sample_prob)
             else:
                 false_probs.append(sample_prob)
-        return ComputeThresholds(topic, train_probs, false_probs)
-
-    def _quality_at_precision(self, precision: int,
-                              sample_quality: List[Dict[str, float]],
-                              train_labels: List[Set[str]]
-                              ) -> Tuple[int, float, float, Counter]:
-        num_complete = 0.0
-        sum_extra = 0.0
-        missing_topics: Counter = Counter()
-        for i, sample_trains in enumerate(train_labels):
-            num_found = 0
-            for train_topic in sample_trains:
-                sample_qual = sample_quality[i].get(train_topic, 0.0)
-                if sample_qual >= precision / 100.0:
-                    num_found += 1
-                else:
-                    missing_topics[train_topic] += 1
-            if num_found >= len(sample_trains):
-                num_complete += 1
-            sum_extra += len([
-                q for q in sample_quality[i].values() if q >= precision / 100.0
-            ]) - num_found
-
-        completeness = num_complete / len(train_labels) * 100
-        extra = sum_extra / len(train_labels)
-        return (precision, completeness, extra, missing_topics)
+        return thresholds.compute(topic, train_probs, false_probs)
 
     def refresh_thresholds(self,
                            limit: int = 2000,
-                           subset_file: Optional[str] = None) -> None:
+                           subset_file: Optional[str] = None,
+                           text_col: Optional[str] = 'text') -> None:
         subset_seqs: List[str] = []
         if subset_file:
-            with open(subset_file, 'r') as subset_handle:
-                subset_seqs = [
-                    row[0]
-                    for row in csv.reader(subset_handle, delimiter=',')
-                    if row
-                ]
+            subset_data = pd.read_csv(subset_file)
+            subset_seqs = subset_data[text_col].tolist()
         with sessionLock:
             samples: List[ClassificationSample] = list(
                 ClassificationSample.query.find(
@@ -373,38 +255,19 @@ class Classifier:
             self.logger.info(str(ti))
             self.topic_infos[ti.topic] = ti
 
-        path_to_thresholds = os.path.join(self.instance_dir, 'thresholds.json')
-        with open(path_to_thresholds, 'w') as f:
-            f.write(
-                json.dumps(
-                    {t: v.to_json_dict()
-                     for t, v in self.topic_infos.items()},
-                    indent=4,
-                    sort_keys=True))
-
-        # Calculate and write out quality information at precision intervals
-        sample_quality = self._props_to_quality(sample_probs)
-        precision_quality: Dict[int, Dict[str, Any]] = {}
-        for precision in [30, 40, 50, 60, 70, 80, 90]:
-            _, completeness, extra, missing_topics = self._quality_at_precision(
-                precision, sample_quality, train_labels)
-            top_missing_topics = {
-                k: (float(v) / len(train_labels) * 100)
-                for (k, v) in missing_topics.most_common(10)
-            }
-            precision_quality[precision] = {
-                'completeness': completeness,
-                'extra': extra,
-                'missing': top_missing_topics
-            }
+        quality = thresholds.quality(self.topic_infos, sample_probs,
+                                     train_labels)
 
         path_to_quality = os.path.join(self.instance_dir, 'quality.json')
         with open(path_to_quality, 'w') as f:
-            f.write(
-                json.dumps({t: v
-                            for t, v in precision_quality.items()},
-                           indent=4,
-                           sort_keys=True))
+            f.write(json.dumps(quality, indent=4, sort_keys=True))
+
+        path_to_evaluation = os.path.join(self.instance_dir, 'evaluation.csv')
+        evaluation = thresholds.evaluate(self.topic_infos)
+        evaluation.to_csv(path_to_evaluation)
+
+        path_to_thresholds = os.path.join(self.instance_dir, 'thresholds.json')
+        thresholds.save(self.topic_infos, path_to_thresholds)
 
     @staticmethod
     def quality_to_predicted_labels(sample_probs: Dict[str, float]
@@ -565,15 +428,38 @@ def add_samples() -> Any:
     refresh_predictions = (data['refresh_predictions']
                            if 'refresh_predictions' in data else False)
 
+    seq_hash_to_seq_index: Dict[str, int] = {}
+    seqs_to_classify: List[str] = []
+
     for i, sample in enumerate(data['samples']):
+        if not sample['seq']:
+            continue
         seqHash = hasher(sample['seq'])
+        if seqHash in seq_hash_to_seq_index:
+            continue
+        with sessionLock:
+            existing1: ClassificationSample = ClassificationSample.query.get(
+                model=args['model'], seqHash=seqHash)
+            if (refresh_predictions or not existing1 or
+                    not existing1.predicted_labels):
+                seqs_to_classify.append(sample['seq'])
+                seq_hash_to_seq_index[seqHash] = len(seqs_to_classify) - 1
+
+    classified_seqs: List[Dict[str, float]]
+    if seqs_to_classify:
+        classified_seqs = c.classify(seqs_to_classify)
+
+    for i, sample in enumerate(data['samples']):
+        if not sample['seq']:
+            continue
+        seqHash = hasher(sample['seq'])
+        sharedId = (sample['sharedId'] if 'sharedId' in sample else '')
+        sample_labels = (sample['training_labels']
+                         if 'training_labels' in sample else [])
 
         with sessionLock:
             existing: ClassificationSample = ClassificationSample.query.get(
                 model=args['model'], seqHash=seqHash)
-            sample_labels = (sample['training_labels']
-                             if 'training_labels' in sample else [])
-            sharedId = (sample['sharedId'] if 'sharedId' in sample else '')
             if existing:
                 response_sample = existing
                 if 'training_labels' in sample:
@@ -594,16 +480,17 @@ def add_samples() -> Any:
         if response_sample:
             if not response_sample.predicted_labels or refresh_predictions:
                 predicted_labels = (Classifier.quality_to_predicted_labels(
-                    c.classify([sample['seq']])[0]))
+                    classified_seqs[seq_hash_to_seq_index[seqHash]]))
                 with sessionLock:
                     response_sample.predicted_labels = predicted_labels
                     session.flush()
 
             response.append(
-                dict(seq=sample['seq'],
+                dict(seq='' if sharedId else sample['seq'],
+                     sharedId=sharedId,
                      predicted_labels=response_sample.predicted_labels))
-        with sessionLock:
-            session.clear()
+    with sessionLock:
+        session.clear()
     return jsonify(dict(samples=response))
 
 

@@ -7,7 +7,8 @@ from flask import Blueprint
 from flask import current_app as app
 from flask import jsonify, request
 
-from app.classifier import Classifier, TopicInfo
+from app.classifier import Classifier
+from app.topic_info import TopicInfo
 
 model_status_bp = Blueprint('model_status_bp', __name__)
 
@@ -86,27 +87,21 @@ class ModelStatus:
                 'error': 'Invalid model name %s' % self.model_name
             }
         preferred = self.get_preferred_model_instance()
+        completeness = 0.0
         topics = {}
-        quality_at_precision: Dict[str, Any] = {}
         if self.classifier:
-            quality_at_precision = self.classifier.quality_infos.get(
-                app.config['DESIRED_CLASSIFIER_PRECISION'], {})
+            completeness = self.classifier.quality_info['completeness']
             for t, ti in self.classifier.topic_infos.items():
                 topics[t] = {
-                    'name':
-                        t,
-                    'samples':
-                        ti.num_samples,
-                    'quality':
-                        ti.recalls.get(
-                            app.config['DESIRED_CLASSIFIER_PRECISION'], 0.0),
+                    'name': t,
+                    'samples': ti.num_samples,
+                    'quality': ti.get_quality(),
                 }
         return {
             'name': self.model_name,
             'instances': instances,
             'preferred': preferred,
-            'completeness': quality_at_precision.get('completeness', 0.0),
-            'extraneous': quality_at_precision.get('extra', 0.0),
+            'completeness': completeness,
             'bert': bert,
             'topics': topics
         }

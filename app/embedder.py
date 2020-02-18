@@ -142,7 +142,7 @@ class Embedder:
             if result[hashed_seq_to_index[hasher(seq)]] is None:
                 undone_seqs.append(seq)
 
-        self.logger.info(
+        self.logger.debug(
             'Using %d of %d embedding matrices fetched from MongoDB.' %
             (len(seqs) - len(undone_seqs), len(seqs)))
         if len(undone_seqs) == 0:
