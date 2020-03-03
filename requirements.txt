@@ -6,12 +6,11 @@ google-cloud-storage==1.23.0
 python-dotenv
 tensorflow==1.15.0
 tensorflow-hub==0.7.0
-numpy==1.17.4
-pandas==0.25.3
+numpy==1.17
+pandas==0.25
 bert-tensorflow==1.0.1
 ming==0.9.1
 waitress==1.4.1
-pandas==0.25
 https://github.com/huridocs/classification-utils/archive/master.zip#egg=classification-utils
 
 # Dev:
