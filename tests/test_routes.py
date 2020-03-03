@@ -32,12 +32,12 @@ def test_classify(app: Flask, fs: FakeFilesystem) -> None:
         resp = client.post(
             '/classify?model=test_model',
             data=json.dumps(
-                {'seqs': ['take forceful action to improve childrens rights']}),
+                {'seqs': ['improve access to health care for children']}),
             content_type='application/json')
     assert resp.status == '200 OK'
     result = json.loads(resp.data)
-    assert result
-    assert result[0]['Rights of the Child'] >= 0.7
+    assert len(result) == 1
+    assert result[0]['Right to health'] >= 0.5
 
 
 def test_all_model_status(app: Flask, fs: FakeFilesystem) -> None:
@@ -62,18 +62,56 @@ def test_all_model_status(app: Flask, fs: FakeFilesystem) -> None:
         'test_instance', 'test_instance_unreleased'
     ]
     assert result['test_model']['preferred'] == 'test_instance'
-    # Pick two random test topics to assert
-    assert result['test_model']['topics']['Asylum-seekers - refugees'] == {
-        'name': 'Asylum-seekers - refugees',
-        'quality': 1.0,
-        'samples': 260
+    assert result['test_model']['completeness'] >= 0.9
+    # Pick random test topics to assert
+    assert result['test_model']['topics']['Poverty'] == {
+        'name': 'Poverty',
+        'quality': 0.81,
+        'samples': 178
     }
-    assert result['test_model']['topics'][
-        'National Human Rights Institution'] == {
-            'name': 'National Human Rights Institution',
-            'quality': 1.0,
-            'samples': 552
-        }
+    # Pick topic with not enough samples for threshold optimization
+    assert result['test_model']['topics']['nan'] == {
+        'name': 'nan',
+        'samples': 0,
+        'quality': 0.0
+    }
+
+
+def test_list_models(app: Flask, fs: FakeFilesystem) -> None:
+    fs.add_real_directory('./testdata/test_model/test_instance')
+    fs.add_real_directory('./testdata/test_model/test_instance_unreleased')
+    fs.add_real_directory('./testdata/test_other_model/test_instance')
+
+    client = app.test_client()
+
+    with app.test_request_context():
+        resp = client.get('/models/list', content_type='application/json')
+    assert resp.status == '200 OK'
+
+    result = json.loads(resp.data)
+
+    assert result
+    assert len(result.keys()) == 1
+    assert set(result['models']) == set(['test_model', 'test_other_model'])
+
+
+def test_list_models_filtered(app: Flask, fs: FakeFilesystem) -> None:
+    fs.add_real_directory('./testdata/test_model/test_instance')
+    fs.add_real_directory('./testdata/test_model/test_instance_unreleased')
+    fs.add_real_directory('./testdata/test_other_model/test_instance')
+
+    client = app.test_client()
+
+    with app.test_request_context():
+        resp = client.get('/models/list?filter=test_other',
+                          content_type='application/json')
+    assert resp.status == '200 OK'
+
+    result = json.loads(resp.data)
+
+    assert result
+    assert len(result.keys()) == 1
+    assert set(result['models']) == set(['test_other_model'])
 
 
 def test_model_status(app: Flask, fs: FakeFilesystem) -> None:
@@ -92,14 +130,15 @@ def test_model_status(app: Flask, fs: FakeFilesystem) -> None:
     assert result
     assert result['instances'] == ['test_instance', 'test_instance_unreleased']
     assert result['preferred'] == 'test_instance'
-    # Pick two random test topics to assert
-    assert result['topics']['Asylum-seekers - refugees'] == {
-        'name': 'Asylum-seekers - refugees',
-        'quality': 1.0,
-        'samples': 260
+    # Pick random test topics to assert
+    assert result['topics']['Poverty'] == {
+        'name': 'Poverty',
+        'quality': 0.81,
+        'samples': 178
     }
-    assert result['topics']['National Human Rights Institution'] == {
-        'name': 'National Human Rights Institution',
-        'quality': 1.0,
-        'samples': 552
+    # Pick topic with not enough samples for threshold optimization
+    assert result['topics']['nan'] == {
+        'name': 'nan',
+        'samples': 0,
+        'quality': 0.0
     }

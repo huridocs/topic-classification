@@ -36,7 +36,7 @@ flags.DEFINE_boolean(
     'If true, output raw probabilities, without using thresholds.')
 
 flags.DEFINE_boolean(
-    'csv_diff_only', True,
+    'csv_diff_only', False,
     'exclude csv output if training and predicted_sure match.')
 flags.DEFINE_float('csv_sure', 0.6,
                    'Precision threshold for "sure" output in csv.')
@@ -66,33 +66,44 @@ flags.DEFINE_string('sharedId_col', '',
 
 
 def outputCsv(c: classifier.Classifier) -> None:
-    filename = '/tmp/%s_%d%s.csv' % (FLAGS.model, FLAGS.limit,
-                                     '_diff' if FLAGS.csv_diff_only else '')
+    filename = './%s_%d%s.csv' % (FLAGS.model, FLAGS.limit,
+                                  '_diff' if FLAGS.csv_diff_only else '')
+    if FLAGS.csv:
+        subset_seqs: List[str] = []
+        with open(FLAGS.csv, 'r') as csvFile, sessionLock:
+            for row in csv.DictReader(csvFile):
+                subset_seqs.append(row[FLAGS.text_col])
+            print(subset_seqs[:10])
+
     with open(filename, 'w') as csvFile:
         writer = csv.writer(csvFile)
         writer.writerow([
-            'sharedId', 'sequence', 'training_labels', 'predicted_sure',
-            'predicted_unsure', 'revised_training_labels'
+            'sharedId', 'sequence', 'training_labels', 'predictions',
+            'probabilities'
         ])
         with sessionLock:
             samples: List[ClassificationSample] = list(
                 ClassificationSample.query.find(
-                    dict(model=FLAGS.model, use_for_training=True)).sort([
+                    dict(model=FLAGS.model, use_for_training=False)).sort([
                         ('seqHash', -1)
                     ]).limit(FLAGS.limit))
+            if FLAGS.csv:
+                samples = [
+                    s for s in samples if any(x in s.seq for x in subset_seqs)
+                ]
         predicted = c.classify([s.seq for s in samples])
         for sample, pred in zip(samples, predicted):
-            train_str = ';'.join([l.topic for l in sample.training_labels])
-            sorted_pred: List[Tuple[str, float]] = sorted(pred.items(),
-                                                          key=lambda e: -e[1])
-            pred_sure_str = ';'.join(
-                [t for t, q in sorted_pred if q >= FLAGS.csv_sure])
-            pred_unsure_str = ';'.join(
-                [t for t, q in sorted_pred if q < FLAGS.csv_sure])
-            if not FLAGS.csv_diff_only or train_str != pred_sure_str:
+            training_labels = [l.topic for l in sample.training_labels]
+            train_str = ';'.join(sorted(training_labels))
+
+            sorted_pred: List[Tuple[str, float]] = sorted(pred.items())
+            predictions = ';'.join([t for t, q in sorted_pred])
+            probabilities = ';'.join([str(q) for t, q in sorted_pred])
+
+            if not FLAGS.csv_diff_only or train_str != predictions:
                 writer.writerow([
-                    sample.sharedId, sample.seq, train_str, pred_sure_str,
-                    pred_unsure_str, ''
+                    sample.sharedId, sample.seq, train_str, predictions,
+                    probabilities
                 ])
     print('Wrote %s.' % filename)
 
@@ -100,6 +111,8 @@ def outputCsv(c: classifier.Classifier) -> None:
 def importData(path: str, text_col: str, label_col: str,
                sharedId_col: str) -> None:
     with open(path, 'r') as csvFile, sessionLock:
+        newly_created: int = 0
+        updated: int = 0
         for row in csv.DictReader(csvFile):
             seq = row[text_col]
             seqHash = hasher(seq)
@@ -121,12 +134,18 @@ def importData(path: str, text_col: str, label_col: str,
                                                 seqHash=seqHash,
                                                 training_labels=training_labels,
                                                 sharedId=sharedId)
+                newly_created += 1
             else:
                 if label_col != '':
                     existing.training_labels = training_labels
                 if sharedId_col != '':
                     existing.sharedId = sharedId
+                if label_col != '' or sharedId_col != '':
+                    updated += 1
+
             existing.use_for_training = len(training_labels) > 0
+        print('CSV Data Import: \nNew created entries: {}\nUpdated entries: {}'
+              .format(newly_created, updated))
         session.flush()
 
 
@@ -147,14 +166,13 @@ def main(_: Any) -> None:
         else:
             print(c.classify([FLAGS.seq]))
     elif FLAGS.mode == 'thresholds':
-        c = classifier.Classifier(
-            FLAGS.classifier_dir,
-            FLAGS.model,
-            forced_instance=FLAGS.instance,
-        )
+        c = classifier.Classifier(FLAGS.classifier_dir,
+                                  FLAGS.model,
+                                  forced_instance=FLAGS.instance)
         c.refresh_thresholds(
             FLAGS.limit, FLAGS.subset_file or
-            os.path.join(c.instance_dir, c.instance_config.subset))
+            os.path.join(c.instance_dir, c.instance_config.subset),
+            FLAGS.text_col)
     elif FLAGS.mode == 'predict':
         c = classifier.Classifier(
             FLAGS.classifier_dir,

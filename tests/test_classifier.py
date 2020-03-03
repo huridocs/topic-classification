@@ -14,19 +14,19 @@ class TestClassifer:
         fs.add_real_directory('./testdata/test_model/test_instance_unreleased')
         c = Classifier('./testdata', 'test_model')
 
-        result = c.classify(['Where is my medical book?'])
+        result = c.classify(['Increase access to health care'])
 
         assert c.vocab is not None
         assert c.embedder is not None
         assert c.predictor is not None
 
         assert c.instance == 'test_instance'
-        print(result)
         assert result
         # result ~ [{topic: probability, topic2: probability, ...}, ...]
         for topic, _ in result[0].items():
             assert topic in c.vocab
-        assert result[0]['Right to education'] >= 0.7
+        assert len(result) == 1
+        assert result[0]['Right to health'] >= 0.8
 
     def test_missing_base_classify_dir(self) -> None:
         fake_classifier_path = './fake_testdata'
