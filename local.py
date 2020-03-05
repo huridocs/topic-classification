@@ -7,7 +7,8 @@ from typing import Any, Dict, List, Tuple
 from absl import app, flags
 
 from app import classifier, embedder, model_fetcher, trainer
-from app.models import ClassificationSample, hasher, session, sessionLock
+from app.models import (ClassificationSample, hasher, session, sessionLock,
+                        training_data_from_db)
 
 FLAGS = flags.FLAGS
 
@@ -45,10 +46,10 @@ flags.DEFINE_string(
     'If set, perform threshold learning only on samples which have a sequence '
     'containing one of the sequences in this csv file.')
 
-flags.DEFINE_enum('mode', 'classify', [
-    'embed', 'classify', 'prefetch', 'thresholds', 'predict', 'csv', 'import',
-    'train'
-], 'The operation to perform.')
+flags.DEFINE_enum(
+    'mode', 'classify',
+    ['embed', 'classify', 'prefetch', 'thresholds', 'csv', 'import', 'train'],
+    'The operation to perform.')
 
 flags.DEFINE_string(
     'csv', '',
@@ -169,17 +170,11 @@ def main(_: Any) -> None:
         c = classifier.Classifier(FLAGS.classifier_dir,
                                   FLAGS.model,
                                   forced_instance=FLAGS.instance)
-        c.refresh_thresholds(
-            FLAGS.limit, FLAGS.subset_file or
+        seqs, training_labels = training_data_from_db(
+            c.model_name, FLAGS.limit, FLAGS.subset_file or
             os.path.join(c.instance_dir, c.instance_config.subset_file),
             FLAGS.text_col)
-    elif FLAGS.mode == 'predict':
-        c = classifier.Classifier(
-            FLAGS.classifier_dir,
-            FLAGS.model,
-            forced_instance=FLAGS.instance,
-        )
-        c.refresh_predictions(FLAGS.limit)
+        c.refresh_thresholds(seqs, training_labels)
     elif FLAGS.mode == 'csv':
         c = classifier.Classifier(
             FLAGS.classifier_dir,
@@ -199,9 +194,14 @@ def main(_: Any) -> None:
         c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
         e = embedder.Embedder(FLAGS.bert)
         t = trainer.Trainer(FLAGS.classifier_dir, FLAGS.model)
+        seqs, training_labels = training_data_from_db(
+            c.model_name, FLAGS.limit, FLAGS.subset_file or
+            os.path.join(c.instance_dir, c.instance_config.subset_file),
+            FLAGS.text_col)
         t.train(embedder=e,
                 vocab=c.vocab,
-                limit=FLAGS.limit,
+                seqs=seqs,
+                training_labels=training_labels,
                 forced_instance=FLAGS.instance,
                 train_ratio=FLAGS.train_ratio,
                 num_train_steps=FLAGS.train_steps)

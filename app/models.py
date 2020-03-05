@@ -2,10 +2,11 @@ import hashlib
 import threading
 from datetime import datetime
 from os import environ
-from typing import Any, Dict
+from typing import Any, Dict, List, Optional, Set, Tuple
 
 import bson
 import dotenv
+import pandas as pd
 from ming import create_datastore, schema
 from ming.odm import FieldProperty, MappedClass, Mapper, ODMSession
 
@@ -99,3 +100,30 @@ class ClassificationSample(MappedClass, JsonOdmHelper):
 
 Mapper.compile_all()
 Mapper.ensure_all_indexes()
+
+
+def training_data_from_db(model_name: str,
+                          limit: int = 2000,
+                          subset_file: Optional[str] = None,
+                          text_col: Optional[str] = 'text'
+                          ) -> Tuple[List[str], List[Set[str]]]:
+    subset_seqs: List[str] = []
+    if subset_file:
+        subset_data = pd.read_csv(subset_file)
+        subset_seqs = subset_data[text_col].tolist()
+    with sessionLock:
+        samples: List[ClassificationSample] = list(
+            ClassificationSample.query.find(
+                dict(model=model_name, use_for_training=True)).sort([
+                    ('seqHash', -1)
+                ]).limit(limit))
+
+        if subset_seqs:
+            samples = [
+                s for s in samples if any(x in s.seq for x in subset_seqs)
+            ]
+        seqs = [s.seq for s in samples]
+        train_labels: List[Set[str]] = [
+            set([l.topic for l in s.training_labels]) for s in samples
+        ]
+        return (seqs, train_labels)

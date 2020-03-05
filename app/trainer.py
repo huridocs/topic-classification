@@ -3,7 +3,7 @@ import logging
 import os
 from datetime import datetime
 from distutils.dir_util import copy_tree
-from typing import Any, Callable, List
+from typing import Any, Callable, List, Set
 
 import numpy as np
 import pandas as pd
@@ -15,7 +15,6 @@ from models import class_based_attention
 import app.tasks as tasks
 from app.classifier import Classifier
 from app.embedder import MAX_SEQ_LENGTH, Embedder
-from app.models import ClassificationSample, sessionLock
 
 train_bp = Blueprint('train_bp', __name__)
 
@@ -172,11 +171,13 @@ class Trainer:
     def train(self,
               embedder: Embedder,
               vocab: List[str],
-              limit: int,
+              seqs: List[str],
+              training_labels: List[Set[str]],
               forced_instance: str = '',
               train_ratio: float = 0.9,
               num_train_steps: int = 1000,
               status_logger: Callable[[str], None] = print) -> Classifier:
+        assert len(seqs) == len(training_labels)
         # timestamp = str(1578318208)
         timestamp = str(int(datetime.utcnow().timestamp()))
         if forced_instance:
@@ -187,28 +188,16 @@ class Trainer:
             vocab.append('nan')
         num_classes = len(vocab)
 
-        with sessionLock:
-            samples: List[ClassificationSample] = list(
-                ClassificationSample.query.find(
-                    dict(model=self.model_name, use_for_training=True)).sort([
-                        ('seqHash', -1)
-                    ]).limit(limit))
-
-            data = pd.DataFrame(data=dict(
-                seq=[s.seq for s in samples],
-                one_hot_labels=[
-                    _one_hot_labels(
-                        list(set([l.topic
-                                  for l in s.training_labels])), vocab)
-                    for s in samples
-                ]))
-        if len(data) == 0:
-            raise RuntimeError('no data found')
+        data = pd.DataFrame(data=dict(seq=seqs,
+                                      one_hot_labels=[
+                                          _one_hot_labels(list(tl), vocab)
+                                          for tl in training_labels
+                                      ]))
 
         if not os.path.exists(instance_path):
-            os.mkdir(instance_path)
+            os.makedirs(instance_path, exist_ok=True)
         if not os.path.exists(train_path):
-            os.mkdir(train_path)
+            os.makedirs(train_path, exist_ok=True)
 
         with open(os.path.join(instance_path, 'label.vocab'), 'w') as f:
             f.writelines([label + '\n' for label in vocab])
@@ -278,11 +267,10 @@ class Trainer:
         c = Classifier(self.base_classifier_dir,
                        self.model_name,
                        forced_instance=timestamp)
-        c.refresh_thresholds(limit,
-                             subset_file=os.path.join(instance_path,
-                                                      'test_seqs.csv'))
+        c.refresh_thresholds([seqs[i] for i in test_values.index],
+                             [training_labels[i] for i in test_values.index])
 
-        config['released'] = True
+        config['is_released'] = True
         with open(os.path.join(instance_path, 'config.json'), 'w') as f:
             json.dump(config, f)
 
@@ -300,7 +288,13 @@ class _TrainModel(tasks.TaskProvider):
         self.model = json['model']
         self.vocab = json['vocab'] if 'vocab' in json else None
         self.bert = json['bert'] if 'bert' in json else None
-        self.limit = json['limit'] if 'limit' in json else 2000
+        self.num_train_steps = json[
+            'num_train_steps'] if 'num_train_steps' in json else 1000
+        self.train_ratio = json['train_ratio'] if 'train_ratio' in json else 0.9
+        self.seqs = [sample['seq'] for sample in json['samples']]
+        self.training_labels = [
+            set(sample['training_labels']) for sample in json['samples']
+        ]
 
     def Run(self, status_holder: tasks.StatusHolder) -> None:
         status_holder.status = 'Training model ' + self.model
@@ -322,9 +316,14 @@ class _TrainModel(tasks.TaskProvider):
         t = Trainer(self.base_classifier_dir, self.model)
         c = t.train(embedder=e,
                     vocab=self.vocab,
-                    limit=self.limit,
+                    seqs=self.seqs,
+                    training_labels=self.training_labels,
+                    num_train_steps=self.num_train_steps,
+                    train_ratio=self.train_ratio,
                     status_logger=status_holder.SetStatus)
-        status_holder.status = 'Trained model {}'.format(str(c))
+        status_holder.status = ('Trained model {}'.format(' '.join([
+            '{}: {}'.format(tn, str(ti)) for tn, ti in c.topic_infos.items()
+        ])))
 
 
 tasks.providers['TrainModel'] = _TrainModel
