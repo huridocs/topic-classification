@@ -171,7 +171,7 @@ def main(_: Any) -> None:
                                   forced_instance=FLAGS.instance)
         c.refresh_thresholds(
             FLAGS.limit, FLAGS.subset_file or
-            os.path.join(c.instance_dir, c.instance_config.subset),
+            os.path.join(c.instance_dir, c.instance_config.subset_file),
             FLAGS.text_col)
     elif FLAGS.mode == 'predict':
         c = classifier.Classifier(

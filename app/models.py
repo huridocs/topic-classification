@@ -5,11 +5,11 @@ from os import environ
 from typing import Any, Dict
 
 import bson
-from dotenv import load_dotenv
+import dotenv
 from ming import create_datastore, schema
 from ming.odm import FieldProperty, MappedClass, Mapper, ODMSession
 
-load_dotenv()
+dotenv.load_dotenv()
 
 DBHOST = environ[
     'DBHOST'] if 'DBHOST' in environ else 'mongodb://localhost:27017'

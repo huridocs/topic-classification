@@ -11,7 +11,6 @@ import tensorflow as tf
 from flask import Blueprint
 from flask import current_app as app
 from flask import jsonify, request
-from utils import evaluate
 
 import app.thresholds as thresholds
 from app import tasks

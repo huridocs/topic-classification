@@ -9,6 +9,9 @@ class StatusHolder:
         self.status = ''
         self.is_done = threading.Event()
 
+    def SetStatus(self, s: str) -> None:
+        self.status = s
+
 
 class TaskProvider:
 

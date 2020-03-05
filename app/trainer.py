@@ -1,10 +1,9 @@
-import csv
 import json
 import logging
 import os
 from datetime import datetime
 from distutils.dir_util import copy_tree
-from typing import Any, List
+from typing import Any, Callable, List
 
 import numpy as np
 import pandas as pd
@@ -177,7 +176,7 @@ class Trainer:
               forced_instance: str = '',
               train_ratio: float = 0.9,
               num_train_steps: int = 1000,
-              test_subset_csv: str = '') -> Classifier:
+              status_logger: Callable[[str], None] = print) -> Classifier:
         # timestamp = str(1578318208)
         timestamp = str(int(datetime.utcnow().timestamp()))
         if forced_instance:
@@ -208,44 +207,30 @@ class Trainer:
 
         if not os.path.exists(instance_path):
             os.mkdir(instance_path)
+        if not os.path.exists(train_path):
             os.mkdir(train_path)
+
         with open(os.path.join(instance_path, 'label.vocab'), 'w') as f:
             f.writelines([label + '\n' for label in vocab])
+
+        config = dict(bert=embedder.bert,
+                      vocab='label.vocab',
+                      is_released=False,
+                      subset_file='test_seqs.csv',
+                      description='From Trainer.train')
         with open(os.path.join(instance_path, 'config.json'), 'w') as f:
-            json.dump(
-                dict(bert=embedder.bert,
-                     vocab='label.vocab',
-                     is_released=False,
-                     training_subset_path='test_seqs.csv',
-                     description='From Trainer.train'), f)
+            json.dump(config, f)
 
-        if test_subset_csv:
-            BLERG
-            subset_seqs: List[str] = []
-            if subset_file:
-                with open(subset_file, 'r') as subset_handle:
-                    subset_seqs = [
-                        row[0]
-                        for row in csv.reader(subset_handle, delimiter=',')
-                        if row
-                    ]
-            print('Subset example: ', subset_seqs[:1])
-            train_values = data.drop()
-        else:
-            train_values = data.sample(frac=train_ratio, random_state=42)
-
+        train_values = data.sample(frac=train_ratio, random_state=42)
         test_values = data.drop(train_values.index)
 
-        with open(os.path.join(instance_path, 'train_seqs.csv'), 'w') as f:
-            writer = csv.writer(f)
-            writer.writerow(['text'])
-            for index, row in train_values.iterrows():
-                writer.writerow([row.seq])
-        with open(os.path.join(instance_path, 'test_seqs.csv'), 'w') as f:
-            writer = csv.writer(f)
-            writer.writerow(['text'])
-            for index, row in test_values.iterrows():
-                writer.writerow([row.seq])
+        train_values['seq'].to_csv(os.path.join(instance_path,
+                                                'train_seqs.csv'),
+                                   index=False,
+                                   header='text')
+        test_values['seq'].to_csv(os.path.join(instance_path, 'test_seqs.csv'),
+                                  index=False,
+                                  header='text')
 
         # dev_values = test_values.sample(frac=0.50, random_state=42)
         # test_values = test_values.drop(dev_values.index)
@@ -271,7 +256,8 @@ class Trainer:
                                            config=run_config,
                                            params=params)
 
-        print('***** Started training at {} *****'.format(datetime.now()))
+        status_logger('***** Started training at {} *****'.format(
+            datetime.now()))
         train_input_fn = input_fn_builder(train_examples,
                                           num_classes,
                                           embedder,
@@ -281,7 +267,8 @@ class Trainer:
         saved_model_path = os.path.join(train_path, 'saved_models')
         estimator.train(input_fn=train_input_fn, steps=num_train_steps)
         save_model(saved_model_path, estimator)
-        print('***** Finished training at {} *****'.format(datetime.now()))
+        status_logger('***** Finished training at {} *****'.format(
+            datetime.now()))
 
         copy_tree(
             os.path.join(saved_model_path,
@@ -294,7 +281,15 @@ class Trainer:
         c.refresh_thresholds(limit,
                              subset_file=os.path.join(instance_path,
                                                       'test_seqs.csv'))
+
+        config['released'] = True
+        with open(os.path.join(instance_path, 'config.json'), 'w') as f:
+            json.dump(config, f)
+
         return c
+
+
+DEFAULT_BERT = 'https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1'
 
 
 class _TrainModel(tasks.TaskProvider):
@@ -311,16 +306,25 @@ class _TrainModel(tasks.TaskProvider):
         status_holder.status = 'Training model ' + self.model
         # Don't use the cache for long-running operations
         if not self.bert or not self.vocab:
-            c = Classifier(self.base_classifier_dir, self.model)
-            if not self.bert:
-                self.bert = c.embedder.bert
-            if not self.vocab:
-                self.vocab = c.vocab
+            try:
+                c = Classifier(self.base_classifier_dir, self.model)
+                if not self.bert:
+                    self.bert = c.embedder.bert
+                if not self.vocab:
+                    self.vocab = c.vocab
+            except Exception:
+                if not self.bert:
+                    self.bert = DEFAULT_BERT
+                if not self.vocab:
+                    raise Exception('Cannot run without vocab!')
 
         e = Embedder(self.bert)
         t = Trainer(self.base_classifier_dir, self.model)
-        status_holder.status = str(
-            t.train(embedder=e, vocab=self.vocab, limit=self.limit))
+        c = t.train(embedder=e,
+                    vocab=self.vocab,
+                    limit=self.limit,
+                    status_logger=status_holder.SetStatus)
+        status_holder.status = 'Trained model {}'.format(str(c))
 
 
 tasks.providers['TrainModel'] = _TrainModel
