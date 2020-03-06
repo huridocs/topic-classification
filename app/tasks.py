@@ -1,4 +1,5 @@
 import threading
+import time
 import traceback
 from typing import Any, Dict, Optional, Type
 
@@ -28,6 +29,9 @@ class _Task(StatusHolder):
         super().__init__()
         self.name = name
         self.provider = provider
+        self.state = 'created'
+        self.start_time = 0
+        self.end_time = 0
         self.status = 'New'
         self.result = None
         self.thread: Optional[threading.Thread] = None
@@ -48,13 +52,17 @@ class _Task(StatusHolder):
             self.thread.join()
 
     def _Run(self) -> None:
+        self.state = 'running'
         self.status = 'Started'
+        self.start_time = int(time.time())
         try:
             self.result = self.provider.Run(self)
-            self.status = 'Done (' + self.status + ')'
+            self.state = 'done'
         except Exception as err:
             traceback.print_exc()
             self.status = 'Failed (' + repr(err) + ')'
+            self.state = 'failed'
+        self.end_time = int(time.time())
         self.is_done.set()
 
 

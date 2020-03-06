@@ -194,6 +194,9 @@ class Trainer:
                                           for tl in training_labels
                                       ]))
 
+        train_values = data.sample(frac=train_ratio, random_state=42)
+        test_values = data.drop(train_values.index)
+
         if not os.path.exists(instance_path):
             os.makedirs(instance_path, exist_ok=True)
         if not os.path.exists(train_path):
@@ -206,12 +209,11 @@ class Trainer:
                       vocab='label.vocab',
                       is_released=False,
                       subset_file='test_seqs.csv',
+                      num_train=len(train_values),
+                      num_test=len(test_values),
                       description='From Trainer.train')
         with open(os.path.join(instance_path, 'config.json'), 'w') as f:
             json.dump(config, f)
-
-        train_values = data.sample(frac=train_ratio, random_state=42)
-        test_values = data.drop(train_values.index)
 
         train_values['seq'].to_csv(os.path.join(instance_path,
                                                 'train_seqs.csv'),
