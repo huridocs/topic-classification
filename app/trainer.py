@@ -13,7 +13,7 @@ from flask import Blueprint
 from models import class_based_attention
 
 import app.tasks as tasks
-from app.classifier import Classifier
+from app.classifier import Classifier, ClassifierCache
 from app.embedder import MAX_SEQ_LENGTH, Embedder
 
 train_bp = Blueprint('train_bp', __name__)
@@ -273,7 +273,7 @@ class Trainer:
         config['is_released'] = True
         with open(os.path.join(instance_path, 'config.json'), 'w') as f:
             json.dump(config, f)
-
+        ClassifierCache.clear(self.base_classifier_dir, self.model_name)
         return c
 
 

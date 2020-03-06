@@ -90,7 +90,8 @@ class ModelStatus:
         completeness = 0.0
         topics = {}
         if self.classifier:
-            completeness = self.classifier.quality_info['completeness']
+            if 'completeness' in self.classifier.quality_info:
+                completeness = self.classifier.quality_info['completeness']
             for t, ti in self.classifier.topic_infos.items():
                 topics[t] = {
                     'name': t,
