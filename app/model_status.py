@@ -75,7 +75,7 @@ class ModelStatus:
         except Exception:
             self.logger.info('No preferred instance config found for model %s' %
                              self.model_name)
-        return ''
+        return {}
 
     def _build_status_dict(self) -> Dict[str, Any]:
         config = self.get_config()

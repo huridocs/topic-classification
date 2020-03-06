@@ -15,9 +15,9 @@ def wait_for_task(client: FlaskClient, name: str) -> None:
                           data=json.dumps({'name': name}),
                           content_type='application/json')
         assert resp.status == '200 OK'
-        status = json.loads(resp.data)['status']
-        assert 'Failed' not in status
-        if 'Done' in status:
+        state = json.loads(resp.data)['state']
+        assert state != 'failed'
+        if state == 'done':
             break
 
 

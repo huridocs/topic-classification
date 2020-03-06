@@ -29,6 +29,9 @@ class TestWait1:
         assert resp.status_code == 200
         data = json.loads(resp.get_data(as_text=True))
         assert data['status'] == 'Started'
+        assert data['state'] == 'running'
+        assert data['start_time'] > 0
+        assert data['end_time'] == 0
 
     def test_get_new_task(self, app: Flask) -> None:
         client = app.test_client()
@@ -58,4 +61,7 @@ class TestWait1:
                               content_type='application/json')
         assert resp.status_code == 200
         data = json.loads(resp.get_data(as_text=True))
-        assert data['status'] == 'Done (Cancelled)'
+        assert data['status'] == 'Cancelled'
+        assert data['state'] == 'done'
+        assert data['start_time'] > 0
+        assert data['end_time'] >= data['start_time']
