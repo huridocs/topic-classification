@@ -123,23 +123,26 @@ class Embedder:
                 'You should never handle more than 5000 berts at the same time!'
             )
 
-        hashed_seq_to_index: Dict[str, int] = {}
+        hashed_seq_to_indices: Dict[str, List[int]] = {}
         for i, seq in enumerate(seqs):
-            hashed_seq_to_index[hasher(seq)] = i
+            if hasher(seq) not in hashed_seq_to_indices:
+                hashed_seq_to_indices[hasher(seq)] = [i]
+            else:
+                hashed_seq_to_indices[hasher(seq)].append(i)
 
         result: List[np.array] = [None] * len(seqs)
         # fetch from cache
         with sessionLock:
             for entry in Embedding.query.find(
                     dict(bert=self.bert,
-                         seqHash={'$in': list(hashed_seq_to_index.keys())}),
+                         seqHash={'$in': list(hashed_seq_to_indices.keys())}),
                     projection=('seqHash', 'embedding')):
-                result[hashed_seq_to_index[entry.seqHash]] = pickle.loads(
-                    entry.embedding)
+                for i in hashed_seq_to_indices[entry.seqHash]:
+                    result[i] = pickle.loads(entry.embedding)
 
         undone_seqs: List[str] = []
         for seq in seqs:
-            if result[hashed_seq_to_index[hasher(seq)]] is None:
+            if result[hashed_seq_to_indices[hasher(seq)][0]] is None:
                 undone_seqs.append(seq)
 
         self.logger.debug(
@@ -155,7 +158,8 @@ class Embedder:
         with sessionLock:
             for seq, matrix in zip(undone_seqs, done_seqs):
                 seqHash = hasher(seq)
-                result[hashed_seq_to_index[seqHash]] = matrix
+                for i in hashed_seq_to_indices[seqHash]:
+                    result[i] = matrix
                 # Prevent duplicate key errors since another thread might
                 # have added this embedding.
                 if not Embedding.query.get(bert=self.bert, seqHash=seqHash):
