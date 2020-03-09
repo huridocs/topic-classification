@@ -14,7 +14,7 @@
       "type": "python",
       "request": "launch",
       "program": "${workspaceFolder}/local.py",
-      "args": ["--mode=train", "--model=planinternational-themes"]
+      "args": ["--mode=classify", "--model=upr-info-issues"]
     },
     {
       "name": "test-this-file",
