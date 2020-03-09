@@ -38,7 +38,7 @@ def test_e2e(app: Flask, fs: FakeFilesystem) -> None:
                                    'train-model',
                                'model':
                                    'trained_model',
-                               'vocab': ['a', 'b', 'c'],
+                               'labels': ['a', 'b', 'c'],
                                'num_train_steps':
                                    10,
                                'train_ratio':

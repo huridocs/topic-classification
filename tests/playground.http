@@ -55,7 +55,7 @@ content-type: application/json
     "provider": "TrainModel",
     "name": "train-dummy_model",
     "model": "dummy_model",
-    "vocab": ["elderly", "cow", "pig", "duck"],
+    "labels": ["elderly", "cow", "pig", "duck"],
     "num_train_steps": 10,
     "train_ratio": 0.4,
     "samples": [

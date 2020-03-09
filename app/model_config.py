@@ -48,8 +48,10 @@ class InstanceConfig(ModelConfig):
         return cast(str, self.get_property('bert'))
 
     @property
-    def vocab(self) -> str:
-        return cast(str, self.get_property('vocab'))
+    def labels(self) -> str:
+        # labels used to be called vocab - fall back for compatibility.
+        return cast(str,
+                    self.get_property('labels') or self.get_property('vocab'))
 
     @property
     def subset_file(self) -> str:

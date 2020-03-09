@@ -49,7 +49,7 @@ class Trainer:
 
     def train(self,
               embedder: Embedder,
-              vocab: List[str],
+              labels: List[str],
               seqs: List[str],
               training_labels: List[Set[str]],
               forced_instance: str = '',
@@ -63,13 +63,13 @@ class Trainer:
             timestamp = forced_instance
         instance_path = os.path.join(self.model_config_path, timestamp)
         train_path = os.path.join(instance_path, 'train')
-        if 'nan' not in vocab:
-            vocab.append('nan')
-        num_classes = len(vocab)
+        if 'nan' not in labels:
+            labels.append('nan')
+        num_classes = len(labels)
 
         data = pd.DataFrame(data=dict(seq=seqs,
                                       one_hot_labels=[
-                                          _one_hot_labels(list(tl), vocab)
+                                          _one_hot_labels(list(tl), labels)
                                           for tl in training_labels
                                       ]))
 
@@ -82,10 +82,10 @@ class Trainer:
             os.makedirs(train_path, exist_ok=True)
 
         with open(os.path.join(instance_path, 'label.vocab'), 'w') as f:
-            f.writelines([label + '\n' for label in vocab])
+            f.writelines([label + '\n' for label in labels])
 
         config = dict(bert=embedder.bert,
-                      vocab='label.vocab',
+                      labels='label.vocab',
                       is_released=False,
                       subset_file='test_seqs.csv',
                       num_train=len(train_values),
@@ -168,8 +168,7 @@ class _TrainModel(tasks.TaskProvider):
         super().__init__(json)
         self.base_classifier_dir = json['base_classifier_dir']
         self.model = json['model']
-        # vocab refers to the model output, e.g. 'Torture'.
-        self.vocab = json['vocab'] if 'vocab' in json else None
+        self.labels = json['labels'] if 'labels' in json else None
         self.bert = json['bert'] if 'bert' in json else None
         self.num_train_steps = json[
             'num_train_steps'] if 'num_train_steps' in json else 1000
@@ -182,23 +181,23 @@ class _TrainModel(tasks.TaskProvider):
     def Run(self, status_holder: tasks.StatusHolder) -> None:
         status_holder.status = 'Training model ' + self.model
         # Don't use the cache for long-running operations
-        if not self.bert or not self.vocab:
+        if not self.bert or not self.labels:
             try:
                 c = Classifier(self.base_classifier_dir, self.model)
                 if not self.bert:
                     self.bert = c.embedder.bert
-                if not self.vocab:
-                    self.vocab = c.vocab
+                if not self.labels:
+                    self.labels = c.labels
             except Exception:
                 if not self.bert:
                     self.bert = DEFAULT_BERT
-                if not self.vocab:
-                    raise Exception('Cannot run without vocab!')
+                if not self.labels:
+                    raise Exception('Cannot run without labels!')
 
         e = Embedder(self.bert)
         t = Trainer(self.base_classifier_dir, self.model)
         c = t.train(embedder=e,
-                    vocab=self.vocab,
+                    labels=self.labels,
                     seqs=self.seqs,
                     training_labels=self.training_labels,
                     num_train_steps=self.num_train_steps,

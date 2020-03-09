@@ -199,7 +199,7 @@ def main(_: Any) -> None:
             os.path.join(c.instance_dir, c.instance_config.subset_file),
             FLAGS.text_col)
         t.train(embedder=e,
-                vocab=c.vocab,
+                labels=c.labels,
                 seqs=seqs,
                 training_labels=training_labels,
                 forced_instance=FLAGS.instance,

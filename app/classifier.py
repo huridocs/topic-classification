@@ -64,7 +64,7 @@ class Classifier:
                     self.instance_config = InstanceConfig(d)
                     self.instance_dir = os.path.join(self.model_config_path,
                                                      self.instance)
-                    self._init_vocab()
+                    self._init_labels()
                     self._init_thresholds()
                     self._init_quality()
                     self._init_embedding()
@@ -74,18 +74,18 @@ class Classifier:
             'No valid instance of model found in %s, instances were %s' %
             (self.model_config_path, instances))
 
-    def _init_vocab(self) -> None:
-        path_to_vocab = os.path.join(self.instance_dir,
-                                     self.instance_config.vocab)
+    def _init_labels(self) -> None:
+        path_to_labels = os.path.join(self.instance_dir,
+                                      self.instance_config.labels)
         try:
-            with open(path_to_vocab, 'r') as f:
-                self.vocab: List[str] = [
+            with open(path_to_labels, 'r') as f:
+                self.labels: List[str] = [
                     line.rstrip() for line in f.readlines() if line.rstrip()
                 ]
         except Exception as e:
             raise Exception(
-                'Failure to load vocab file from %s with exception: %s' %
-                (path_to_vocab, e))
+                'Failure to load labels file from %s with exception: %s' %
+                (path_to_labels, e))
 
     def _init_embedding(self) -> None:
         try:
@@ -122,7 +122,7 @@ class Classifier:
                         ti = TopicInfo(k)
                         ti.load_json_dict(v)
                         self.topic_infos[k] = ti
-            for topic in self.vocab:
+            for topic in self.labels:
                 if topic not in self.topic_infos:
                     self.topic_infos[topic] = TopicInfo(topic)
         except Exception as e:
@@ -185,7 +185,7 @@ class Classifier:
             topic_probs[i] = {
                 t: p
                 # p.item() is used to convert from numpy float to python float.
-                for t, p in zip(self.vocab,
+                for t, p in zip(self.labels,
                                 [p.item() for p in probabilities[i]])
                 if p > 0
             }
@@ -239,7 +239,7 @@ class Classifier:
         # TODO(bdittes): Enable multiprocessing.
         for ti in [
                 Classifier._build_info(training_labels, sample_probs, topic)
-                for topic in self.vocab
+                for topic in self.labels
         ]:
             self.logger.info(str(ti))
             self.topic_infos[ti.topic] = ti
