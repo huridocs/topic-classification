@@ -31,13 +31,20 @@ def test_classify(app: Flask, fs: FakeFilesystem) -> None:
     with app.test_request_context():
         resp = client.post(
             '/classify?model=test_model',
-            data=json.dumps(
-                {'seqs': ['improve access to health care for children']}),
+            data=json.dumps({
+                'samples': [{
+                    'seq': 'improve access to health care for children'
+                }]
+            }),
             content_type='application/json')
     assert resp.status == '200 OK'
     result = json.loads(resp.data)
-    assert len(result) == 1
-    assert result[0]['Right to health'] >= 0.5
+    assert result == dict(samples=[
+        dict(model_version='test_instance',
+             predicted_labels=[dict(quality=1.0, topic='Right to health')],
+             seq='improve access to health care for children',
+             sharedId='')
+    ])
 
 
 def test_all_model_status(app: Flask, fs: FakeFilesystem) -> None:

@@ -65,21 +65,20 @@ class ModelStatus:
                              self.model_name)
         return ''
 
-    def get_bert(self) -> str:
+    def get_config(self) -> Dict[str, Any]:
         if not self.classifier:
-            return ''
+            return {}
         try:
             if self.classifier is not None:
-                return self.classifier.instance_config.bert if (
-                    self.model_name) else ''
+                return self.classifier.instance_config._config if (
+                    self.model_name) else {}
         except Exception:
-            self.logger.info(
-                'No preferred instance with BERT specified found for model %s' %
-                self.model_name)
-        return ''
+            self.logger.info('No preferred instance config found for model %s' %
+                             self.model_name)
+        return {}
 
     def _build_status_dict(self) -> Dict[str, Any]:
-        bert = self.get_bert()
+        config = self.get_config()
         instances = self.list_model_instances()
         if not instances or self.classifier is None:
             return {
@@ -90,7 +89,8 @@ class ModelStatus:
         completeness = 0.0
         topics = {}
         if self.classifier:
-            completeness = self.classifier.quality_info['completeness']
+            if 'completeness' in self.classifier.quality_info:
+                completeness = self.classifier.quality_info['completeness']
             for t, ti in self.classifier.topic_infos.items():
                 topics[t] = {
                     'name': t,
@@ -102,7 +102,7 @@ class ModelStatus:
             'instances': instances,
             'preferred': preferred,
             'completeness': completeness,
-            'bert': bert,
+            'config': config,
             'topics': topics
         }
 

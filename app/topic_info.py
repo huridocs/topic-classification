@@ -1,4 +1,5 @@
 import json
+from copy import deepcopy
 from typing import Any, Dict
 
 import pandas as pd
@@ -15,7 +16,7 @@ class TopicInfo:
             columns=['threshold', 'f1', 'precision', 'recall'])
 
     def to_json_dict(self) -> Dict[str, Any]:
-        obj_dict = self.__dict__
+        obj_dict = deepcopy(self.__dict__)
         obj_dict['scores'] = json.loads(self.scores.to_json(orient='index'))
         return obj_dict
 

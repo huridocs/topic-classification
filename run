@@ -26,7 +26,7 @@ fi
 . ./venv/bin/activate || exit -1
 
 if [ $CMD = "devserver" ]; then
-    flask run --host=0.0.0.0 --port=5005 "$@"
+    flask run --host=0.0.0.0 --port=5005 --no-reload "$@"
 elif [ $CMD = "server" ]; then
     python prodserver.py "$@"
 elif [ $CMD = "local" ]; then

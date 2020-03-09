@@ -3,17 +3,15 @@ import logging
 import os
 import threading
 from datetime import datetime
-from typing import Any, Dict, List, Optional, Set
+from typing import Any, Dict, List, Set
 
 import numpy as np
-import pandas as pd
 import tensorflow as tf
 from flask import Blueprint
 from flask import current_app as app
 from flask import jsonify, request
 
 import app.thresholds as thresholds
-from app import tasks
 from app.embedder import MAX_SEQ_LENGTH, Embedder
 from app.model_config import InstanceConfig
 from app.models import ClassificationSample, hasher, session, sessionLock
@@ -32,7 +30,10 @@ class Classifier:
                               (e.g. UPR_2percent_ps0).
     """
 
-    def __init__(self, base_classifier_dir: str, model_name: str):
+    def __init__(self,
+                 base_classifier_dir: str,
+                 model_name: str,
+                 forced_instance: str = ''):
         self.logger = logging.getLogger()
         self.lock = threading.Lock()
         if not os.path.isdir(base_classifier_dir):
@@ -40,6 +41,7 @@ class Classifier:
                             base_classifier_dir)
         self.model_name = model_name
         self.model_config_path = os.path.join(base_classifier_dir, model_name)
+        self.forced_instance = forced_instance
         self.topic_infos: Dict[str, TopicInfo] = {}
         self.quality_info: Dict[str, Any] = {}
         self._load_instance_config()
@@ -50,15 +52,19 @@ class Classifier:
         instances = os.listdir(self.model_config_path)
         # pick the latest released instance
         for i in sorted(instances, reverse=True):
-            with open(os.path.join(self.model_config_path, i,
-                                   'config.json')) as f:
+            config_path = os.path.join(self.model_config_path, i, 'config.json')
+            if not os.path.exists(config_path):
+                continue
+            if self.forced_instance and self.forced_instance != i:
+                continue
+            with open(config_path) as f:
                 d = json.loads(f.read())
-                if d['is_released']:
+                if d['is_released'] or self.forced_instance == i:
                     self.instance = i
                     self.instance_config = InstanceConfig(d)
                     self.instance_dir = os.path.join(self.model_config_path,
                                                      self.instance)
-                    self._init_vocab()
+                    self._init_labels()
                     self._init_thresholds()
                     self._init_quality()
                     self._init_embedding()
@@ -68,18 +74,18 @@ class Classifier:
             'No valid instance of model found in %s, instances were %s' %
             (self.model_config_path, instances))
 
-    def _init_vocab(self) -> None:
-        path_to_vocab = os.path.join(self.instance_dir,
-                                     self.instance_config.vocab)
+    def _init_labels(self) -> None:
+        path_to_labels = os.path.join(self.instance_dir,
+                                      self.instance_config.labels)
         try:
-            with open(path_to_vocab, 'r') as f:
-                self.vocab: List[str] = [
+            with open(path_to_labels, 'r') as f:
+                self.labels: List[str] = [
                     line.rstrip() for line in f.readlines() if line.rstrip()
                 ]
         except Exception as e:
             raise Exception(
-                'Failure to load vocab file from %s with exception: %s' %
-                (path_to_vocab, e))
+                'Failure to load labels file from %s with exception: %s' %
+                (path_to_labels, e))
 
     def _init_embedding(self) -> None:
         try:
@@ -116,7 +122,7 @@ class Classifier:
                         ti = TopicInfo(k)
                         ti.load_json_dict(v)
                         self.topic_infos[k] = ti
-            for topic in self.vocab:
+            for topic in self.labels:
                 if topic not in self.topic_infos:
                     self.topic_infos[topic] = TopicInfo(topic)
         except Exception as e:
@@ -179,7 +185,7 @@ class Classifier:
             topic_probs[i] = {
                 t: p
                 # p.item() is used to convert from numpy float to python float.
-                for t, p in zip(self.vocab,
+                for t, p in zip(self.labels,
                                 [p.item() for p in probabilities[i]])
                 if p > 0
             }
@@ -222,41 +228,24 @@ class Classifier:
                 false_probs.append(sample_prob)
         return thresholds.compute(topic, train_probs, false_probs)
 
-    def refresh_thresholds(self,
-                           limit: int = 2000,
-                           subset_file: Optional[str] = None,
-                           text_col: Optional[str] = 'text') -> None:
-        subset_seqs: List[str] = []
-        if subset_file:
-            subset_data = pd.read_csv(subset_file)
-            subset_seqs = subset_data[text_col].tolist()
-        with sessionLock:
-            samples: List[ClassificationSample] = list(
-                ClassificationSample.query.find(
-                    dict(model=self.model_name, use_for_training=True)).sort([
-                        ('seqHash', -1)
-                    ]).limit(limit))
-
-            if subset_seqs:
-                samples = [
-                    s for s in samples if any(x in s.seq for x in subset_seqs)
-                ]
-            seqs = [s.seq for s in samples]
-            train_labels: List[Set[str]] = [
-                set([l.topic for l in s.training_labels]) for s in samples
-            ]
+    def refresh_thresholds(self, seqs: List[str],
+                           training_labels: List[Set[str]]) -> None:
+        assert len(seqs) == len(training_labels)
+        if len(seqs) < 10:
+            raise RuntimeError('Cannot refresh thresholds since there '
+                               'are not enough training samples!')
         sample_probs = self._classify_probs(seqs)
 
         # TODO(bdittes): Enable multiprocessing.
         for ti in [
-                Classifier._build_info(train_labels, sample_probs, topic)
-                for topic in self.vocab
+                Classifier._build_info(training_labels, sample_probs, topic)
+                for topic in self.labels
         ]:
             self.logger.info(str(ti))
             self.topic_infos[ti.topic] = ti
 
         quality = thresholds.quality(self.topic_infos, sample_probs,
-                                     train_labels)
+                                     training_labels)
 
         path_to_quality = os.path.join(self.instance_dir, 'quality.json')
         with open(path_to_quality, 'w') as f:
@@ -275,35 +264,6 @@ class Classifier:
         return sorted(
             [dict(topic=t, quality=q) for t, q in sample_probs.items()],
             key=lambda o: -o['quality'])
-
-    def refresh_predictions(self, limit: int = 2000,
-                            batch_size: int = 1000) -> None:
-        with sessionLock:
-            samples: List[ClassificationSample] = list(
-                ClassificationSample.query.find(
-                    dict(model=self.model_name)).sort([('seqHash', -1)
-                                                       ]).limit(limit))
-            seqs = [s.seq for s in samples]
-
-        for i in range(0, len(seqs), batch_size):
-            sample_probs = self.classify(seqs[i:i + batch_size])
-
-            with sessionLock:
-                for i, seq in enumerate(seqs[i:i + batch_size]):
-                    sample: ClassificationSample = (
-                        ClassificationSample.query.get(model=self.model_name,
-                                                       seqHash=hasher(seq)))
-                    if sample:
-                        sample.predicted_labels = (
-                            Classifier.quality_to_predicted_labels(
-                                sample_probs[i]))
-                    else:
-                        print('ERROR: lost sample')
-                session.flush()
-                # This is harsh, but it seems otherwise some cache builds up
-                # inside ming and eventually OOM's the application...
-                # Thankfully, due to sessionLock this should be safe.
-                session.clear()
 
 
 class ClassifierCache:
@@ -340,47 +300,6 @@ class ClassifierCache:
             cls._entries = {}
 
 
-class _RefreshThresholdsTask(tasks.TaskProvider):
-
-    def __init__(self, json: Any):
-        super().__init__(json)
-        self.base_classifier_dir = json['base_classifier_dir']
-        self.model = json['model']
-        self.limit = json['limit'] if 'limit' in json else 2000
-
-    def Run(self, status_holder: tasks.StatusHolder) -> None:
-        status_holder.status = 'Loading classifier ' + self.model
-        # Don't use the cache for long-running operations
-        c = Classifier(self.base_classifier_dir, self.model)
-        status_holder.status = 'Refreshing thresholds for ' + self.model
-        c.refresh_thresholds(self.limit)
-        ClassifierCache.clear(self.base_classifier_dir, self.model)
-        status_holder.status = ''
-
-
-tasks.providers['RefreshThresholds'] = _RefreshThresholdsTask
-
-
-class _RefreshPredictionsTask(tasks.TaskProvider):
-
-    def __init__(self, json: Any):
-        super().__init__(json)
-        self.base_classifier_dir = json['base_classifier_dir']
-        self.model = json['model']
-        self.limit = json['limit'] if 'limit' in json else 2000
-
-    def Run(self, status_holder: tasks.StatusHolder) -> None:
-        status_holder.status = 'Loading classifier ' + self.model
-        # Don't use the cache for long-running operations
-        c = Classifier(self.base_classifier_dir, self.model)
-        status_holder.status = 'Refreshing predictions ' + self.model
-        c.refresh_predictions(self.limit)
-        status_holder.status = ''
-
-
-tasks.providers['RefreshPredictions'] = _RefreshPredictionsTask
-
-
 @classify_bp.route('/clear_cache', methods=['PUT'])
 def clear_cache() -> Any:
     ClassifierCache.clear_all()
@@ -389,31 +308,68 @@ def clear_cache() -> Any:
 @classify_bp.route('/classify', methods=['POST'])
 def classify() -> Any:
     # request.args: &model=upr-info_issues[&probs]
-    # request.get_json: {'seq'='hello world', 'probs': True/False}
+    # request.get_json: {'samples': [{'seq': 'hello world',
+    #                                 'sharedId': 'asda12'},
+    #                                ...]}
+    # returns {'samples': [{'seq': '',
+    #                       'sharedId': 'asda12',
+    #                       'model_version': '1234',
+    #                       'predicted_labels': [...]}]}
     data = request.get_json()
     args = request.args
 
+    if not args['model']:
+        raise Exception('You need to pass &model=...')
+
     c = ClassifierCache.get(app.config['BASE_CLASSIFIER_DIR'], args['model'])
-    # Allow 'probs' to be set in args or data as an option to return
-    # raw probabilities.
-    if 'probs' in args or ('probs' in data and data['probs']):
-        results = c._classify_probs(data['seqs'])
-    else:
-        results = c.classify(data['seqs'])
-    return jsonify(results)
+
+    seq_hash_to_seq_index: Dict[str, int] = {}
+    seqs_to_classify: List[str] = []
+
+    for i, sample in enumerate(data['samples']):
+        if not sample['seq']:
+            continue
+        seqHash = hasher(sample['seq'])
+        if seqHash in seq_hash_to_seq_index:
+            continue
+        seqs_to_classify.append(sample['seq'])
+        seq_hash_to_seq_index[seqHash] = len(seqs_to_classify) - 1
+
+    classified_seqs: List[Dict[str, float]]
+    if seqs_to_classify:
+        classified_seqs = c.classify(seqs_to_classify)
+
+    response = []
+    for i, sample in enumerate(data['samples']):
+        if not sample['seq']:
+            continue
+        sharedId = (sample['sharedId'] if 'sharedId' in sample else '')
+
+        predicted_labels = (Classifier.quality_to_predicted_labels(
+            classified_seqs[seq_hash_to_seq_index[seqHash]]))
+        response.append(
+            dict(seq='' if sharedId else sample['seq'],
+                 sharedId=sharedId,
+                 predicted_labels=predicted_labels,
+                 model_version=c.instance))
+    with sessionLock:
+        session.clear()
+    return jsonify(dict(samples=response))
 
 
 @classify_bp.route('/classification_sample', methods=['PUT'])
 def add_samples() -> Any:
     # request.args: &model=upr-info_issues
-    # request.get_json: {'samples': [{'seq': "hello world',
+    # request.get_json: {'samples': [{'seq': 'hello world',
     #                                 'sharedId': 'asda12',
     #                                 'training_labels'?: [
-    #                                     {'topic':"Murder},
+    #                                     {'topic': 'Murder'},
     #                                     {'topic': 'Justice'}]},
     #                                ...],
     #                    'refresh_predictions': true }
-    # returns {'samples': [{'seq': "hello world", "predicted_labels": [...]}]}
+    # returns {'samples': [{'seq': '',
+    #                       'sharedId': 'asda12',
+    #                       'predicted_labels': [...]}]}
     data = request.get_json()
     args = request.args
 

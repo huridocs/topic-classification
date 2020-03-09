@@ -6,11 +6,12 @@ google-cloud-storage==1.23.0
 python-dotenv
 tensorflow==1.15.0
 tensorflow-hub==0.7.0
-numpy==1.17.4
-pandas==0.25.3
+numpy==1.17
+pandas==0.25
 bert-tensorflow==1.0.1
 ming==0.9.1
 waitress==1.4.1
+https://github.com/huridocs/classification-utils/archive/master.zip#egg=classification-utils
 
 # Dev:
 pip
@@ -26,9 +27,3 @@ pyfakefs==3.6.1
 pytest==5.3.0
 pytest-env
 mypy
-
-# To install mypy in vscode, install the 'mypy' plugin and run these:
-# sudo apt install python3.8-venv python3.8-dev
-# python3.8 -m venv ~/.mypyls
-# ~/.mypyls/bin/pip install wheel
-# ~/.mypyls/bin/pip install "https://github.com/matangover/mypyls/archive/master.zip#egg=mypyls[patched-mypy]"

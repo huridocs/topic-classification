@@ -11,11 +11,17 @@ task_bp = Blueprint('task_bp', __name__)
 
 @task_bp.route('/task', methods=['GET'])
 def get_task() -> Any:
-    data = request.get_json()
-    t = tasks.GetTask(data['name'])
+    name = (request.args['name']
+            if 'name' in request.args else request.get_json()['name'])
+    t = tasks.GetTask(name)
     if not t:
         abort(404)
-    return jsonify({'status': t.status})
+    return jsonify({
+        'status': t.status,
+        'state': t.state,
+        'start_time': t.start_time,
+        'end_time': t.end_time
+    })
 
 
 @task_bp.route('/task', methods=['POST'])
@@ -31,7 +37,12 @@ def push_task() -> Any:
         abort(400)
     if not t.thread:
         t.Start()
-    return jsonify({'status': t.status})
+    return jsonify({
+        'status': t.status,
+        'state': t.state,
+        'start_time': t.start_time,
+        'end_time': t.end_time
+    })
 
 
 @task_bp.route('/task', methods=['DELETE'])
@@ -42,4 +53,9 @@ def delete_task() -> Any:
         abort(404)
     if t.thread:
         t.Stop(join=False)
-    return jsonify({'status': t.status})
+    return jsonify({
+        'status': t.status,
+        'state': t.state,
+        'start_time': t.start_time,
+        'end_time': t.end_time
+    })

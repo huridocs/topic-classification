@@ -16,7 +16,7 @@ class TestClassifer:
 
         result = c.classify(['Increase access to health care'])
 
-        assert c.vocab is not None
+        assert c.labels is not None
         assert c.embedder is not None
         assert c.predictor is not None
 
@@ -24,7 +24,7 @@ class TestClassifer:
         assert result
         # result ~ [{topic: probability, topic2: probability, ...}, ...]
         for topic, _ in result[0].items():
-            assert topic in c.vocab
+            assert topic in c.labels
         assert len(result) == 1
         assert result[0]['Right to health'] >= 0.8
 
@@ -50,12 +50,12 @@ class TestClassifer:
                            (model_path, r'\[\'test_instance_unreleased\'\]')):
             Classifier(self.BASE_CLASSIFIER_PATH, 'test_model')
 
-    def test_missing_vocab_file(self, fs: FakeFilesystem) -> None:
+    def test_missing_labels_file(self, fs: FakeFilesystem) -> None:
         fs.add_real_directory('./testdata/test_model/test_instance')
         fs.remove_object('./testdata/test_model/test_instance/label.vocab')
         with pytest.raises(
                 Exception,
-                match=(r'Failure to load vocab file from {0} with exception')
+                match=(r'Failure to load labels file from {0} with exception')
                 .format('./testdata/test_model/test_instance/label.vocab')):
             Classifier(self.BASE_CLASSIFIER_PATH, 'test_model')
 
@@ -64,7 +64,7 @@ class TestClassifer:
         config = """
         {
             "bert": "%s",
-            "vocab": "label.vocab",
+            "labels": "label.vocab",
             "is_released": true,
             "description": "This is the latest model from Sascha.",
             "metadata": {

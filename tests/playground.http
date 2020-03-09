@@ -36,50 +36,144 @@ POST http://localhost:5005/classify?model=upr-info-issues HTTP/1.1
 content-type: application/json
 
 {
-    "seqs": [
-        "continue to defend children's rights",
-        "implement measures against enforced disappearance"
+    "samples": [
+        {
+            "seq": "continue to defend children's rights"
+        },
+        {
+            "seq": "implement measures against enforced disappearance",
+            "sharedId": "123"
+        }
     ]
 }
 
-### Thresholds task
+### Train task
 POST http://localhost:5005/task HTTP/1.1
 content-type: application/json
 
 {
-    "provider": "RefreshThresholds",
-    "name": "refresh-upr-info-issues",
-    "model": "upr-info-issues",
-    "limit": 5000
+    "provider": "TrainModel",
+    "name": "train-dummy_model",
+    "model": "dummy_model",
+    "labels": ["elderly", "cow", "pig", "duck"],
+    "num_train_steps": 10,
+    "train_ratio": 0.4,
+    "samples": [
+        {
+            "seq": "old macdonal had a farm",
+            "training_labels": ["elderly"]
+        },
+        {
+            "seq": "old macdonal has a farm",
+            "training_labels": ["elderly"]
+        },
+        {
+            "seq": "old macdonal with the farm",
+            "training_labels": ["elderly"]
+        },
+        {
+            "seq": "old macdonal had a farm 2",
+            "training_labels": ["elderly"]
+        },
+        {
+            "seq": "old macdonal has a farm 2",
+            "training_labels": ["elderly"]
+        },
+        {
+            "seq": "old macdonal with the farm 2",
+            "training_labels": ["elderly"]
+        },
+        {
+            "seq": "old macdonal had a farm 3",
+            "training_labels": ["elderly"]
+        },
+        {
+            "seq": "old macdonal has a farm 3",
+            "training_labels": ["elderly"]
+        },
+        {
+            "seq": "old macdonal with the farm 3",
+            "training_labels": ["elderly"]
+        },
+        {
+            "seq": "old macdonal had a farm 4",
+            "training_labels": ["elderly"]
+        },
+        {
+            "seq": "old macdonal has a farm 4",
+            "training_labels": ["elderly"]
+        },
+        {
+            "seq": "old macdonal with the farm 4",
+            "training_labels": ["elderly"]
+        },
+        {
+            "seq": "old macdonal had a farm 5",
+            "training_labels": ["elderly"]
+        },
+        {
+            "seq": "old macdonal has a farm 5",
+            "training_labels": ["elderly"]
+        },
+        {
+            "seq": "old macdonal with the farm 5",
+            "training_labels": ["elderly"]
+        },
+        {
+            "seq": "old macdonal had a farm 6",
+            "training_labels": ["elderly"]
+        },
+        {
+            "seq": "old macdonal has a farm 6",
+            "training_labels": ["elderly"]
+        },
+        {
+            "seq": "old macdonal with the farm 6",
+            "training_labels": ["elderly"]
+        },
+        {
+            "seq": "And on his farm he had a cow",
+            "training_labels": ["cow"]
+        },
+        {
+            "seq": "With a moo moo here",
+            "training_labels": ["cow"]
+        },
+        {
+            "seq": "Here a moo, there a moo",
+            "training_labels": ["cow"]
+        },
+        {
+            "seq": "Everywhere a moo moo",
+            "training_labels": ["cow"]
+        },
+        {
+            "seq": "And on his farm he had a cow 2",
+            "training_labels": ["cow"]
+        },
+        {
+            "seq": "With a moo moo here 2",
+            "training_labels": ["cow"]
+        },
+        {
+            "seq": "Here a moo, there a moo 2",
+            "training_labels": ["cow"]
+        },
+        {
+            "seq": "Everywhere a moo moo 2",
+            "training_labels": ["cow"]
+        }
+    ]
 }
 
-### Thresholds task GET
+### Train task GET
 GET http://localhost:5005/task HTTP/1.1
 content-type: application/json
 
 {
-    "name": "refresh-upr-info-issues"
+    "name": "train-dummy_model"
 }
 
-
-### Prediction task
-POST http://localhost:5005/task HTTP/1.1
-content-type: application/json
-
-{
-    "provider": "RefreshPredictions",
-    "name": "predict-upr-info-issues",
-    "model": "upr-info-issues",
-    "limit": 500000
-}
-
-### Prediction task GET
-GET http://localhost:5005/task HTTP/1.1
-content-type: application/json
-
-{
-    "name": "predict-upr-info-issues"
-}
 
 ### Get seqs
 GET http://localhost:5005/classification_sample?model=upr-info-issues&seq=*&limit=3 HTTP/1.1

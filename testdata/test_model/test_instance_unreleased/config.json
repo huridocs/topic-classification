@@ -1,9 +1,9 @@
 {
-    "bert": "https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1",
-    "vocab": "label.vocab",
-    "is_released": false,
-    "description": "Test Model",
-    "metadata": {
-        "thesaurus": "issues"
-    }
+  "bert": "https://tfhub.dev/google/bert_uncased_L-12_H-768_A-12/1",
+  "labels": "label.vocab",
+  "is_released": false,
+  "description": "Test Model",
+  "metadata": {
+    "thesaurus": "issues"
+  }
 }

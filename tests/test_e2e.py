@@ -1,4 +1,6 @@
 import json
+import os
+import shutil
 import time
 
 from flask import Flask
@@ -13,75 +15,51 @@ def wait_for_task(client: FlaskClient, name: str) -> None:
                           data=json.dumps({'name': name}),
                           content_type='application/json')
         assert resp.status == '200 OK'
-        status = json.loads(resp.data)['status']
-        assert 'Failed' not in status
-        if 'Done' in status:
+        state = json.loads(resp.data)['state']
+        assert state != 'failed'
+        if state == 'done':
             break
 
 
 def test_e2e(app: Flask, fs: FakeFilesystem) -> None:
+    fs.pause()
+    app.config['BASE_CLASSIFIER_DIR'] = '/tmp/tctest/testdata'
+    if os.path.exists(app.config['BASE_CLASSIFIER_DIR']):
+        shutil.rmtree(app.config['BASE_CLASSIFIER_DIR'])
+    os.makedirs(app.config['BASE_CLASSIFIER_DIR'], exist_ok=True)
     seq_pattern = ('Continue working for the eradiction of poverty %d')
-    instance_path = './testdata/test_model/test_instance'
-    fs.add_real_directory(instance_path)
-    fs.remove_object('./testdata/test_model/test_instance/thresholds.json')
-    fs.remove_object('./testdata/test_model/test_instance/quality.json')
     client = app.test_client()
     with app.test_request_context():
+        assert client.post('/task',
+                           data=json.dumps({
+                               'provider':
+                                   'TrainModel',
+                               'name':
+                                   'train-model',
+                               'model':
+                                   'trained_model',
+                               'labels': ['a', 'b', 'c'],
+                               'num_train_steps':
+                                   10,
+                               'train_ratio':
+                                   0.5,
+                               'samples': [
+                                   dict(seq=seq_pattern % i,
+                                        training_labels=['a'])
+                                   for i in range(0, 30)
+                               ]
+                           }),
+                           content_type='application/json').status == '200 OK'
+        wait_for_task(client, 'train-model')
+
         # without threshold file default confidence is set to 0.3
-        resp = client.post('/classify?model=test_model',
-                           data=json.dumps({'seqs': [seq_pattern % 1]}),
+        resp = client.post('/classify?model=trained_model',
+                           data=json.dumps(
+                               dict(samples=[dict(seq=seq_pattern % 1)])),
                            content_type='application/json')
         assert resp.status == '200 OK'
-        data = json.loads(resp.data)[0]
-        assert len(data) == 1
-        assert data['Poverty'] == 0.3
-
-        # now we add training labels and optimize the thresholds
-        assert client.put('/classification_sample?model=test_model',
-                          data=json.dumps({
-                              'samples': [{
-                                  'seq': seq_pattern % i,
-                                  'training_labels': [{
-                                      'topic': 'Poverty'
-                                  }]
-                              } for i in range(20)]
-                          }),
-                          content_type='application/json').status == '200 OK'
-
-        resp = client.get('/classification_sample?model=test_model&seq=*')
-        assert resp.status == '200 OK'
-        assert len(json.loads(resp.data)) == 20
-
-        assert client.post('/task',
-                           data=json.dumps({
-                               'provider': 'RefreshThresholds',
-                               'name': 'thres',
-                               'model': 'test_model'
-                           }),
-                           content_type='application/json').status == '200 OK'
-        wait_for_task(client, 'thres')
-
-        # test prediction
-        for i in range(20, 25):
-            resp = client.post('/classify?model=test_model',
-                               data=json.dumps({'seqs': [seq_pattern % i]}),
-                               content_type='application/json')
-            assert resp.status == '200 OK'
-            data = json.loads(resp.data)[0]
-            assert len(data) == 1
-            assert data['Poverty'] >= 0.9
-
-        assert client.post('/task',
-                           data=json.dumps({
-                               'provider': 'RefreshPredictions',
-                               'name': 'pred',
-                               'model': 'test_model'
-                           }),
-                           content_type='application/json').status == '200 OK'
-        wait_for_task(client, 'pred')
-
-        resp = client.get('/classification_sample?model=test_model&seq=*')
-        assert resp.status == '200 OK'
         data = json.loads(resp.data)
-        assert len(data) == 20
-        assert data[0]['predicted_labels'][0]['topic'] == 'Poverty'
+        print(data)
+        assert len(data['samples']) == 1
+        assert data['samples'][0]['predicted_labels'][0]['topic'] == 'a'
+        assert data['samples'][0]['predicted_labels'][0]['quality'] >= 0.7

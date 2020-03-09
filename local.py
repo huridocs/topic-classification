@@ -6,8 +6,9 @@ from typing import Any, Dict, List, Tuple
 
 from absl import app, flags
 
-from app import classifier, embedder, model_fetcher
-from app.models import ClassificationSample, hasher, session, sessionLock
+from app import classifier, embedder, model_fetcher, trainer
+from app.models import (ClassificationSample, hasher, session, sessionLock,
+                        training_data_from_db)
 
 FLAGS = flags.FLAGS
 
@@ -18,6 +19,8 @@ flags.DEFINE_string('classifier_dir', './classifier_models',
                     'The dir containing classifier models.')
 flags.DEFINE_string('model', 'UPR_2percent_ps0',
                     'The model trained for a particular label set.')
+flags.DEFINE_string('instance', '',
+                    'If set, force the given instance dir, e.g. "1578385362".')
 flags.DEFINE_string('seq', 'increase efforts to end forced disappearance',
                     'The string sequence to process')
 flags.DEFINE_string(
@@ -26,6 +29,8 @@ flags.DEFINE_string(
     'saved models from and where to copy them to.')
 flags.DEFINE_integer('limit', 2000,
                      'Max number of classification samples to use')
+flags.DEFINE_integer('train_steps', 1000, 'Number of training iterations.')
+flags.DEFINE_float('train_ratio', 0.7, 'Train / eval split of labeled data.')
 
 flags.DEFINE_boolean(
     'probs', False,
@@ -43,7 +48,7 @@ flags.DEFINE_string(
 
 flags.DEFINE_enum(
     'mode', 'classify',
-    ['embed', 'classify', 'prefetch', 'thresholds', 'predict', 'csv', 'import'],
+    ['embed', 'classify', 'prefetch', 'thresholds', 'csv', 'import', 'train'],
     'The operation to perform.')
 
 flags.DEFINE_string(
@@ -152,19 +157,30 @@ def main(_: Any) -> None:
         ms = e.get_embedding(seqs)
         print([(seq, len(m.tostring())) for seq, m in zip(seqs, ms)])
     elif FLAGS.mode == 'classify':
-        c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
+        c = classifier.Classifier(
+            FLAGS.classifier_dir,
+            FLAGS.model,
+            forced_instance=FLAGS.instance,
+        )
         if FLAGS.probs:
             print(c._classify_probs([FLAGS.seq]))
         else:
             print(c.classify([FLAGS.seq]))
     elif FLAGS.mode == 'thresholds':
-        c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
-        c.refresh_thresholds(FLAGS.limit, FLAGS.subset_file, FLAGS.text_col)
-    elif FLAGS.mode == 'predict':
-        c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
-        c.refresh_predictions(FLAGS.limit)
+        c = classifier.Classifier(FLAGS.classifier_dir,
+                                  FLAGS.model,
+                                  forced_instance=FLAGS.instance)
+        seqs, training_labels = training_data_from_db(
+            c.model_name, FLAGS.limit, FLAGS.subset_file or
+            os.path.join(c.instance_dir, c.instance_config.subset_file),
+            FLAGS.text_col)
+        c.refresh_thresholds(seqs, training_labels)
     elif FLAGS.mode == 'csv':
-        c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
+        c = classifier.Classifier(
+            FLAGS.classifier_dir,
+            FLAGS.model,
+            forced_instance=FLAGS.instance,
+        )
         outputCsv(c)
     elif FLAGS.mode == 'prefetch':
         f = model_fetcher.Fetcher(FLAGS.fetch_config_path, FLAGS.model)
@@ -174,6 +190,21 @@ def main(_: Any) -> None:
     elif FLAGS.mode == 'import':
         importData(FLAGS.csv, FLAGS.text_col, FLAGS.label_col,
                    FLAGS.sharedId_col)
+    elif FLAGS.mode == 'train':
+        c = classifier.Classifier(FLAGS.classifier_dir, FLAGS.model)
+        e = embedder.Embedder(FLAGS.bert)
+        t = trainer.Trainer(FLAGS.classifier_dir, FLAGS.model)
+        seqs, training_labels = training_data_from_db(
+            c.model_name, FLAGS.limit, FLAGS.subset_file or
+            os.path.join(c.instance_dir, c.instance_config.subset_file),
+            FLAGS.text_col)
+        t.train(embedder=e,
+                labels=c.labels,
+                seqs=seqs,
+                training_labels=training_labels,
+                forced_instance=FLAGS.instance,
+                train_ratio=FLAGS.train_ratio,
+                num_train_steps=FLAGS.train_steps)
     return
 
 
