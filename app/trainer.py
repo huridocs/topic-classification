@@ -36,6 +36,21 @@ def _one_hot_labels(label_list: List[str], all_labels: List[str]) -> List[int]:
     return labels
 
 
+class LogStatusHook(tf.estimator.SessionRunHook):
+
+    def __init__(self, num_train_steps: int,
+                 status_logger: Callable[[str], None]):
+        super().__init__()
+        self.done_steps = 0
+        self.num_train_steps = num_train_steps
+        self.status_logger = status_logger
+
+    def after_run(self, _run_context: Any, _run_values: Any) -> None:
+        self.done_steps += 1
+        self.status_logger('Trained {} of {} steps.'.format(
+            self.done_steps, self.num_train_steps))
+
+
 class Trainer:
 
     def __init__(self, base_classifier_dir: str, model_name: str) -> None:
@@ -136,7 +151,10 @@ class Trainer:
                                           batch_size=BATCH_SIZE)
 
         saved_model_path = os.path.join(train_path, 'saved_models')
-        estimator.train(input_fn=train_input_fn, steps=num_train_steps)
+
+        estimator.train(input_fn=train_input_fn,
+                        steps=num_train_steps,
+                        hooks=[LogStatusHook(num_train_steps, status_logger)])
         save_model(saved_model_path, estimator)
         status_logger('***** Finished training at {} *****'.format(
             datetime.now()))

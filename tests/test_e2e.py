@@ -15,10 +15,11 @@ def wait_for_task(client: FlaskClient, name: str) -> None:
                           data=json.dumps({'name': name}),
                           content_type='application/json')
         assert resp.status == '200 OK'
-        state = json.loads(resp.data)['state']
-        assert state != 'failed'
-        if state == 'done':
+        task_state = json.loads(resp.data)
+        assert task_state['state'] != 'failed'
+        if task_state['state'] == 'done':
             break
+        print(task_state)
 
 
 def test_e2e(app: Flask, fs: FakeFilesystem) -> None:
