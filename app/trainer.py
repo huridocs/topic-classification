@@ -30,7 +30,9 @@ BATCH_SIZE = 256
 
 def _one_hot_labels(label_list: List[str], all_labels: List[str]) -> List[int]:
     labels = [0] * len(all_labels)
-    indices = [all_labels.index(label) for label in label_list]
+    indices = [
+        all_labels.index(label) for label in label_list if label in all_labels
+    ]
     for ind in indices:
         labels[ind] = 1
     return labels
