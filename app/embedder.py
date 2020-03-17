@@ -9,6 +9,7 @@ import tensorflow as tf
 import tensorflow_hub as hub
 from bert import tokenization as token
 from flask import Blueprint, jsonify, request
+from pymongo.errors import DuplicateKeyError
 
 from app.models import Embedding, hasher, session, sessionLock
 
@@ -168,7 +169,10 @@ class Embedder:
                               seq=seq,
                               seqHash=seqHash,
                               embedding=pickle.dumps(matrix))
-            session.flush()
+            try:
+                session.flush()
+            except DuplicateKeyError:
+                pass
         self.logger.info('Stored %d embedding matrices in MongoDB.' %
                          len(done_seqs))
         return result
