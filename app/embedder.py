@@ -63,7 +63,6 @@ class _HubEmbedder(_Embedder):
         self.session.run(init_op)
         vocab_file, do_lower_case = self.session.run(
             [t_info['vocab_file'], t_info['do_lower_case']])
-        print('###', vocab_file, do_lower_case)
         self.tokenizer = token.FullTokenizer(vocab_file=vocab_file,
                                              do_lower_case=do_lower_case)
 
