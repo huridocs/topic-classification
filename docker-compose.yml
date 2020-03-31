@@ -1,0 +1,15 @@
+version: '3'
+services:
+  topic-classification:
+    build: .
+    container_name: 'topic-classification'
+    ports:
+      - "5005:5005"
+    volumes:
+      - .:/code
+  mongo:
+    image: "mongo:4.0.1"
+    volumes:
+      - ./db:/data/db
+    ports:
+      - '28017-28019:27017-27019'

@@ -12,10 +12,8 @@ from ming.odm import FieldProperty, MappedClass, Mapper, ODMSession
 
 dotenv.load_dotenv()
 
-DBHOST = environ[
-    'DBHOST'] if 'DBHOST' in environ else 'mongodb://localhost:27017'
-DATABASE_NAME = environ[
-    'DATABASE_NAME'] if 'DATABASE_NAME' in environ else 'classifier_dev'
+DBHOST = environ['DBHOST'] if 'DBHOST' in environ else 'mongodb://mongo:27017'
+DATABASE_NAME = environ['DATABASE_NAME'] if 'DATABASE_NAME' in environ else 'classifier_dev'
 
 datastore = create_datastore(DBHOST + '/' + DATABASE_NAME)
 session = ODMSession(bind=datastore, autoflush=False)
