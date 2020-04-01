@@ -5,8 +5,13 @@ services:
     container_name: 'topic-classification'
     ports:
       - "5005:5005"
+    environment:
+      DBHOST: "mongodb://mongo:27017"
+      DATABASE_NAME: "classifier_dev"
     volumes:
       - .:/code
+    depends_on:
+      - mongo
   mongo:
     image: "mongo:4.0.1"
     volumes:
