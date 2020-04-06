@@ -1,5 +1,40 @@
 # topic-classification
 
+## Run it with docker-compose
+
+#### Requirements:
+* Docker-copmose [install guide -> https://docs.docker.com/compose/install/]
+
+#### Usage:
+After installing docker-compose, go to the root folder of this project and run 
+
+`docker-compose up`
+
+Once the server is up, use the following endpoint.
+
+POST 'localhost:5005/classify?model=[MODEL_NAME]'
+
+##### Parameters
+
+model: different models can be used, specify a model name
+
+samples: a json with the samples with the following format
+
+`{'samples': [{'seq': 'hello world'}, {'seq': 'other sentence}...]}`
+
+##### Returns 
+
+It returns an object with the labels for each sample with the following format.
+
+`{'samples': [{'seq': '', 'model_version': '1234', 'predicted_labels': {'quality':0.96, 'topic': 'topid_id'}, ...]}`
+
+#### Example:
+
+curl  -H "Content-Type: application/json" -X POST -d '{"samples":[{"seq": "85.50. Ensure that children living and working on the street are provided with adequate protection, assistance, health care, education and shelter (Hungary);"}]}' 'localhost:5005/classify?model=SDGs'
+
+
+# Advance usage
+
 Learn and apply paragraph to topic training.
 
 ## Installation
