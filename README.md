@@ -33,7 +33,7 @@ It returns an object with the labels for each sample with the following format.
 curl  -H "Content-Type: application/json" -X POST -d '{"samples":[{"seq": "85.50. Ensure that children living and working on the street are provided with adequate protection, assistance, health care, education and shelter (Hungary);"}]}' 'localhost:5005/classify?model=SDGs'
 
 
-# Advance usage
+# Advanced usage
 
 Learn and apply paragraph to topic training.
 
