@@ -3,7 +3,7 @@
 ## Run it with docker-compose
 
 #### Requirements:
-* Docker-copmose [install guide -> https://docs.docker.com/compose/install/]
+* Docker-compose [install guide -> https://docs.docker.com/compose/install/]
 
 #### Usage:
 After installing docker-compose, go to the root folder of this project and run 
@@ -16,9 +16,9 @@ POST 'localhost:5005/classify?model=[MODEL_NAME]'
 
 ##### Parameters
 
-model: different models can be used, specify a model name
+**model**: different models can be used, specify a model name
 
-samples: a json with the samples with the following format
+**samples**: a json with the samples with the following format
 
 `{'samples': [{'seq': 'hello world'}, {'seq': 'other sentence}...]}`
 
