@@ -32,25 +32,23 @@ def test_e2e(app: Flask, fs: FakeFilesystem) -> None:
     other_seq_pattern = ('Actions to prevent climate change %d')
     client = app.test_client()
     samples = list()
-    samples += [dict(seq=seq_pattern % i, training_labels=['a'])
-                for i in range(0, 15)]
-    samples += [dict(seq=other_seq_pattern % i, training_labels=['b'])
-                for i in range(0, 15)]
+    samples += [
+        dict(seq=seq_pattern % i, training_labels=['a']) for i in range(0, 15)
+    ]
+    samples += [
+        dict(seq=other_seq_pattern % i, training_labels=['b'])
+        for i in range(0, 15)
+    ]
 
     with app.test_request_context():
         assert client.post('/task',
                            data=json.dumps({
-                               'provider':
-                                   'TrainModel',
-                               'name':
-                                   'train-model',
-                               'model':
-                                   'trained_model',
+                               'provider': 'TrainModel',
+                               'name': 'train-model',
+                               'model': 'trained_model',
                                'labels': ['a', 'b', 'c'],
-                               'num_train_steps':
-                                   10,
-                               'train_ratio':
-                                   0.5,
+                               'num_train_steps': 10,
+                               'train_ratio': 0.5,
                                'samples': samples
                            }),
                            content_type='application/json').status == '200 OK'
@@ -59,8 +57,10 @@ def test_e2e(app: Flask, fs: FakeFilesystem) -> None:
         # without threshold file default confidence is set to 0.3
         resp = client.post('/classify?model=trained_model',
                            data=json.dumps(
-                               dict(samples=[dict(seq=seq_pattern % 1),
-                                             dict(seq=other_seq_pattern % 1)])),
+                               dict(samples=[
+                                   dict(seq=seq_pattern % 1),
+                                   dict(seq=other_seq_pattern % 1)
+                               ])),
                            content_type='application/json')
         assert resp.status == '200 OK'
         data = json.loads(resp.data)
