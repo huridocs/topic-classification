@@ -153,7 +153,7 @@ def importData(path: str, text_col: str, label_col: str,
 def main(_: Any) -> None:
     if FLAGS.mode == 'embed':
         e = embedder.Embedder(FLAGS.bert)
-        seqs = [FLAGS.seq, FLAGS.seq + ' 2']
+        seqs = [FLAGS.seq]
         ms = e.get_embedding(seqs)
         print([(seq, len(m.tostring())) for seq, m in zip(seqs, ms)])
     elif FLAGS.mode == 'classify':

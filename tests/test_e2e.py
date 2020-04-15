@@ -1,5 +1,6 @@
 import json
 import os
+import random
 import shutil
 import time
 
@@ -29,7 +30,12 @@ def test_e2e(app: Flask, fs: FakeFilesystem) -> None:
         shutil.rmtree(app.config['BASE_CLASSIFIER_DIR'])
     os.makedirs(app.config['BASE_CLASSIFIER_DIR'], exist_ok=True)
     seq_pattern = ('Continue working for the eradiction of poverty %d')
+    other_seq_pattern = ('Actions to prevent climate change %d')
     client = app.test_client()
+    samples = list()
+    samples += [dict(seq=seq_pattern % i, training_labels=['a']) for i in range(0, 15)]
+    samples += [dict(seq=other_seq_pattern % i, training_labels=['b']) for i in range(0, 15)]
+
     with app.test_request_context():
         assert client.post('/task',
                            data=json.dumps({
@@ -44,11 +50,7 @@ def test_e2e(app: Flask, fs: FakeFilesystem) -> None:
                                    10,
                                'train_ratio':
                                    0.5,
-                               'samples': [
-                                   dict(seq=seq_pattern % i,
-                                        training_labels=['a'])
-                                   for i in range(0, 30)
-                               ]
+                               'samples': samples
                            }),
                            content_type='application/json').status == '200 OK'
         wait_for_task(client, 'train-model')
@@ -56,11 +58,11 @@ def test_e2e(app: Flask, fs: FakeFilesystem) -> None:
         # without threshold file default confidence is set to 0.3
         resp = client.post('/classify?model=trained_model',
                            data=json.dumps(
-                               dict(samples=[dict(seq=seq_pattern % 1)])),
+                               dict(samples=[dict(seq=seq_pattern % 1), dict(seq=other_seq_pattern % 1)])),
                            content_type='application/json')
         assert resp.status == '200 OK'
         data = json.loads(resp.data)
-        print(data)
-        assert len(data['samples']) == 1
+        assert len(data['samples']) == 2
         assert data['samples'][0]['predicted_labels'][0]['topic'] == 'a'
         assert data['samples'][0]['predicted_labels'][0]['quality'] >= 0.7
+        assert data['samples'][1]['predicted_labels'][0]['topic'] == 'b'

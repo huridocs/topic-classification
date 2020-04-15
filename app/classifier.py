@@ -344,6 +344,7 @@ def classify() -> Any:
         if not sample['seq']:
             continue
         sharedId = (sample['sharedId'] if 'sharedId' in sample else '')
+        seqHash = hasher(sample['seq'])
 
         predicted_labels = (Classifier.quality_to_predicted_labels(
             classified_seqs[seq_hash_to_seq_index[seqHash]]))
