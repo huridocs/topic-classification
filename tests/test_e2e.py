@@ -10,7 +10,7 @@ from pyfakefs.fake_filesystem import FakeFilesystem
 
 def wait_for_task(client: FlaskClient, name: str) -> None:
     while True:
-        time.sleep(0.1)
+        time.sleep(0.5)
         resp = client.get('/task',
                           data=json.dumps({'name': name}),
                           content_type='application/json')
