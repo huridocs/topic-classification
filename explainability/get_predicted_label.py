@@ -34,5 +34,6 @@ def get_predicted_labels(text: str):
     return 1 if 'non-citizens' in str(result['samples'][0]['predicted_labels']) else 0
 
 
-class_name = get_predicted_labels('non-citizens pink people')
-print(class_name)
+if __name__ == "__main__":
+    class_name = get_predicted_labels('non-citizens pink people')
+    print(class_name)
