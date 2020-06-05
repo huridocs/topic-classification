@@ -18,6 +18,8 @@ with open('../updated_data/UHRI_affected_persons.pkl', 'rb') as f:
 
 print('# of total examples: {}'.format(len(data)))
 
+
+
 samples_text = data['text'].tolist()
 
 class_i = -1  # the index for the class we focus on
@@ -49,23 +51,28 @@ explainer = LimeTextExplainer(class_names=class_names)
 
 
 def get_predicted_labels(texts: List[str]):
+    batch_size = 10
     print(f'Predicting {len(texts)} samples')
-    classes_predictions = numpy.zeros((len(texts), 2))
+    classes_predictions = list()
 
+    samples_batch = []
     for index, text in enumerate(texts):
-        sample_to_send = {'samples': [{"seq": text}]}
-        response = requests.post(url='http://localhost:5005/classify',
-                                        headers={'Content-Type': 'application/json'},
-                                        params=(('model', 'affected_persons'),),
-                                        data=json.dumps(sample_to_send))
+        samples_batch.append(text)
 
-        result = json.loads(response.text)
-        if 'non_citizens' in str(result['samples'][0]['predicted_labels']):
-            classes_predictions[index][1] = 1
-        else:
-            classes_predictions[index][0] = 1
+        if len(samples_batch) == batch_size:
+            sample_to_send = {'samples': [{"seq": t} for t in samples_batch]}
+            response = requests.post(url='http://localhost:5005/classify',
+                                     headers={'Content-Type': 'application/json'},
+                                     params=(('model', 'affected_persons'),),
+                                     data=json.dumps(sample_to_send))
 
-    return classes_predictions
+            result = json.loads(response.text)['samples']
+            results = [[1, 0] if 'non_citizens' in str(each_result['predicted_labels']) else [0, 1] for each_result in result]
+
+            classes_predictions.extend(results)
+            samples_batch = []
+
+    return numpy.array(classes_predictions)
 
 
 def easy(texts):
