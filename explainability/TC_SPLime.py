@@ -1,33 +1,19 @@
 #!/usr/bin/env python
 # coding: utf-8
 
-import lime
-import sklearn
-import sklearn.ensemble
-import sklearn.metrics
-import sys
 import numpy
-import pandas
-import nltk
 import pickle
+import requests
+from requests.adapters import HTTPAdapter
+import json
+import matplotlib
+import matplotlib.pyplot as plt
 
-# import python modules
-from utils import modeling, optimization, tokenization
-from utils.analysis import plot_category_distribution
-
-# Connect to google cloud
-from google.colab import auth
-
-from explainability import get_predicted_label
-
-auth.authenticate_user()
-
-#@title Load
-from load import load_data, load_unique_labels
-from utils import io
+from lime.lime_text import LimeTextExplainer
+from lime import submodular_pick
 
 # load the pkl file
-with open('updated_data/UHRI_affected_persons.pkl', 'rb') as f:
+with open('../updated_data/UHRI_affected_persons.pkl', 'rb') as f:
   data = pickle.load(f)
   #col1: 'text' contains string of paragraph
   #last col: 'one_hot_labels' for labeled #
@@ -56,22 +42,64 @@ def get_labels(one_hot_labels_list):
 
 samples_classes = get_labels(data['one_hot_labels'].to_list())
 
-from lime.lime_text import LimeTextExplainer
 explainer = LimeTextExplainer(class_names=class_names)
 
-# SP Lime !!! 
-from lime import submodular_pick
+# SP Lime !!!
 
-# add get_predicted_label method to be used for sp-lime, so we can use our own model
+def requests_retry_session(retries=3, backoff_factor=0.3, status_forcelist=(500, 502, 504), session=None):
+  session = session or requests.Session()
+  retry = requests.packages.urllib3.util.retry.Retry(
+    total=retries,
+    read=retries,
+    connect=retries,
+    backoff_factor=backoff_factor,
+    status_forcelist=status_forcelist,
+  )
+  adapter = HTTPAdapter(max_retries=retry)
+  session.mount('http://', adapter)
+  session.mount('https://', adapter)
+  return session
+
+def get_predicted_labels(texts: str):
+  request_adapter = requests_retry_session()
+
+  data = dict()
+  data['samples'] = [{"seq": s} for s in texts]
+
+  response = request_adapter.post(url='http://localhost:5005/classify',
+                                  headers={'Content-Type': 'application/json'},
+                                  params=(('model', 'affected_persons'),),
+                                  data=json.dumps(data))
+
+  if response.status_code != 200: # checking if the http request failed
+    print('failed try again?')
+    return numpy.zeros((len(data), 2))
+  result = json.loads(response.text)
+
+  full_results = numpy.zeros((len(data), 2))
+  for index, sample in enumerate(result['samples']):
+    if 'non_citizens' in str(sample['predicted_labels']):
+      full_results[index][1] = 1
+    else:
+      full_results[index][0] = 1
+
+  return full_results
+
+def easy(texts):
+  return numpy.array([[1, 0] for s in texts])
 
 
-sp_obj = submodular_pick.SubmodularPick(explainer, samples_classes, get_predicted_label, sample_size=100, num_features=10, num_exps_desired=20) # method='full'
-# can add "method='full'" to get explanations from entire data
+sp_obj = submodular_pick.SubmodularPick(explainer, samples_text, get_predicted_labels, sample_size=1, num_features=10, num_exps_desired=1)
 # num_exps_desired is the number of explanation objects returned
 # num_features is maximum number of features present in explanation
 # sample_size is the number of instances to explain if method == 'sample'
 # ^ default method == 'sample' will sample the data uniformly at random
 
 # shows us the features for the instances selected for one label
-[exp.as_pyplot_figure(label=exp.available_labels()[0]) for exp in sp_obj.sp_explanations]; 
+
+# add a function for a directory to store figures in
+# add directories for storing figures in from different runs
+for l in [exp.as_pyplot_figure(label=exp.available_labels()[0]) for exp in sp_obj.sp_explanations]:
+  #l.show()
+  l.savefig('fig.png')
 
