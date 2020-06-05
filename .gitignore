@@ -9,3 +9,4 @@ db/*
 *.pyo
 .DS_Store
 .idea
+/updated_data/
