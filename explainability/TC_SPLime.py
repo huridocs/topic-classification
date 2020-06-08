@@ -87,25 +87,52 @@ updated_samples_classes = [samples_classes[i] for i in indices_list_ok_samples]
 print(f'\nThe updated data has this many samples in it: {len(updated_samples_texts)}')
 print(f'The # of times the specified class is in the updated data is: {count_labels_in_specific_class(updated_samples_classes)}')
 
-class_names = ['nothing', specific_class]
+class_names = ['other', specific_class]
 explainer = LimeTextExplainer(class_names=class_names)
 
 print('\nStarting SP-Lime!!!')
-print('Go to the terminal where the server is running to get further updates...')
-sp_obj = submodular_pick.SubmodularPick(explainer, updated_samples_texts, get_predicted_labels, sample_size=2, num_features=5, num_exps_desired=1)
-# num_exps_desired is the number of explanation objects returned
+sp_obj = submodular_pick.SubmodularPick(explainer, updated_samples_texts, get_predicted_labels, sample_size=10, num_features=5, num_exps_desired=2)
+# num_exps_desired is the number of explanation objects returned per class
 # num_features is maximum number of features present in explanation
 # sample_size is the number of instances to explain if method == 'sample'
 # ^ default method == 'sample' will sample the data uniformly at random
 
-#TODO: check this...not yet sure if it works
-df = pd.DataFrame({})
-for this_label in range(2):
+# TODO: test the below sp_obj data visualizations out on a future run
+
+# shows the best features found for the sp_explanations selected from each class
+for class_index in range(2):
+    print(f'Class {class_index} features: ')
+    for index, explanation in enumerate(sp_obj.sp_explanations):
+        exp_list = explanation.as_list(label=class_index)
+        print(exp_list)
+
+# how to get the explanations in a pandas DF for the first class, label=0
+df_class0_explanations = pd.DataFrame({})
+dfl = []
+for index, explanation in enumerate(sp_obj.sp_explanations):
+    exp_list = explanation.as_list(label=0)
+    exp_list.append(("exp number", index))
+    dfl.append(dict(exp_list))
+df_class0_explanations = pd.DataFrame(dfl, index=[class_names[0] for i in range(len(sp_obj.sp_explanations))])
+print(df_class0_explanations)
+
+# how to get the explanations in a pandas DF for the second class, label=1
+df_class1_explanations = pd.DataFrame({})
+dfl = []
+for index, explanation in enumerate(sp_obj.sp_explanations):
+    exp_list = explanation.as_list(label=1)
+    exp_list.append(("exp number", index))
+    dfl.append(dict(exp_list))
+df_class1_explanations = pd.DataFrame(dfl, index=[class_names[1] for i in range(len(sp_obj.sp_explanations))])
+print(df_class1_explanations)
+
+# how to show the full pandas DF of features for chosen explanations for both classes
+full_df = pd.DataFrame({})
+for class_index in range(2):
     dfl = []
-    for i, exp in enumerate(sp_obj.sp_explanations):
-        l = exp.as_list(label=this_label)
-        l.append(("exp number", i))
-        dfl.append(dict(l))
-    dftest = pd.DataFrame(dfl)
-    df = df.append(pd.DataFrame(dfl, index=[class_names[this_label] for i in range(len(sp_obj.sp_explanations))]))
-print(df)
+    for index, explanation in enumerate(sp_obj.sp_explanations):
+        explanation_list = explanation.as_list(label=class_index)
+        explanation_list.append(("exp number", index))
+        dfl.append(dict(explanation_list))
+    full_df = full_df.append(pd.DataFrame(dfl, index=[class_names[class_index] for i in range(len(sp_obj.sp_explanations))]))
+print(full_df)
