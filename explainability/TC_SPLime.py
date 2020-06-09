@@ -1,15 +1,19 @@
 #!/usr/bin/env python
 # coding: utf-8
+from random import choice
 from typing import List
 
 import numpy
-import pandas as pd
+import os
+from datetime import datetime
 import pickle
 import requests
 import json
+import matplotlib.pyplot as plt
 
 from lime.lime_text import LimeTextExplainer
 from lime import submodular_pick
+
 
 def set_labels(specific_class: str, labels_list: List[str]) -> List[int]:
     classes_list = []
@@ -51,6 +55,18 @@ def get_predicted_labels(texts: List[str]):
 
     return numpy.array(classes_predictions)
 
+# Function mainly for debugging the prediction function
+def easy(texts: List[str]) -> numpy.array:
+    full_predicted_labels = []
+    for text in texts:
+        first_label = choice([0, 1])
+        second_label = 1 if first_label == 0 else 0
+        predicted_labels = [first_label, second_label]
+        full_predicted_labels.append(predicted_labels)
+    return numpy.array(full_predicted_labels)
+
+plt.ion()
+
 # load the pkl file
 with open('../updated_data/UHRI_affected_persons.pkl', 'rb') as f:
     data = pickle.load(f)
@@ -91,48 +107,43 @@ class_names = ['other', specific_class]
 explainer = LimeTextExplainer(class_names=class_names)
 
 print('\nStarting SP-Lime!!!')
-sp_obj = submodular_pick.SubmodularPick(explainer, updated_samples_texts, get_predicted_labels, sample_size=10, num_features=5, num_exps_desired=2)
+# TODO: replace easy with get_predicted_labels when ready./r
+sp_obj = submodular_pick.SubmodularPick(explainer, updated_samples_texts, easy, sample_size=2, num_features=5, num_exps_desired=2)
 # num_exps_desired is the number of explanation objects returned per class
 # num_features is maximum number of features present in explanation
 # sample_size is the number of instances to explain if method == 'sample'
 # ^ default method == 'sample' will sample the data uniformly at random
 
-# TODO: test the below sp_obj data visualizations out on a future run
+# define the name of the directory to be created
+time = datetime.now().strftime("%Y%m%d-%H%M%S%f")
 
-# shows the best features found for the sp_explanations selected from each class
-for class_index in range(2):
-    print(f'Class {class_index} features: ')
-    for index, explanation in enumerate(sp_obj.sp_explanations):
-        exp_list = explanation.as_list(label=class_index)
-        print(exp_list)
+path = f'Run_{time}'
+print(path)
 
-# how to get the explanations in a pandas DF for the first class, label=0
-df_class0_explanations = pd.DataFrame({})
-dfl = []
-for index, explanation in enumerate(sp_obj.sp_explanations):
-    exp_list = explanation.as_list(label=0)
-    exp_list.append(("exp number", index))
-    dfl.append(dict(exp_list))
-df_class0_explanations = pd.DataFrame(dfl, index=[class_names[0] for i in range(len(sp_obj.sp_explanations))])
-print(df_class0_explanations)
+try:
+    os.mkdir(path)
+except OSError:
+    print("Creation of the directory %s failed" % path)
+else:
+    print("Successfully created the directory %s " % path)
 
-# how to get the explanations in a pandas DF for the second class, label=1
-df_class1_explanations = pd.DataFrame({})
-dfl = []
-for index, explanation in enumerate(sp_obj.sp_explanations):
-    exp_list = explanation.as_list(label=1)
-    exp_list.append(("exp number", index))
-    dfl.append(dict(exp_list))
-df_class1_explanations = pd.DataFrame(dfl, index=[class_names[1] for i in range(len(sp_obj.sp_explanations))])
-print(df_class1_explanations)
+index = 0
+for fig in [exp.as_pyplot_figure(label=exp.available_labels()[0]) for exp in sp_obj.sp_explanations]:
+    fig.savefig(f'{path}/fig{index}.png')
+    index += 1
 
-# how to show the full pandas DF of features for chosen explanations for both classes
-full_df = pd.DataFrame({})
-for class_index in range(2):
-    dfl = []
-    for index, explanation in enumerate(sp_obj.sp_explanations):
-        explanation_list = explanation.as_list(label=class_index)
-        explanation_list.append(("exp number", index))
-        dfl.append(dict(explanation_list))
-    full_df = full_df.append(pd.DataFrame(dfl, index=[class_names[class_index] for i in range(len(sp_obj.sp_explanations))]))
-print(full_df)
+# TODO: next steps
+#  1. figure out how to get the sp_obj.sp_explanation words for each class
+#  2. try running code without docker (./run server)
+#  3. make a main function and run for one class
+#  4. add +/- features to csv functionality
+#  5. transfer .py file to a google colab file and run
+#  6. add main run functionality for all classes and save to same csv file
+
+# TODO: other options to try along the way...
+#  figure out how to use laptop gpu (see readme for gpu usage) WITH docker
+#  try WITHOUT DOCKER and get the model and run it
+
+# TODO: end goal
+#  get a csv which has positive+negative features for all classes
+#  visualize the csv results
