@@ -169,7 +169,7 @@ def run_splime_for_TC(word_count_max: int, focus_class: str, sp_samples_num: int
     explainer = LimeTextExplainer(class_names=class_names)
 
     print('\nStarting SP-Lime!!!')
-    # TODO: replace easy with model prediction function when ready
+    # TODO: replace dummy function 'easy' with model prediction function when ready
     sp_obj = submodular_pick.SubmodularPick(explainer, updated_samples_texts, easy,
                                             sample_size=sp_samples_num, num_features=sp_features_num,
                                             num_exps_desired=sp_explanations_num)
@@ -206,16 +206,3 @@ if __name__ == "__main__":
     # TODO: when we want to add a for loop for all labels, save the first path_to_csv so that it can be the same for all
     path_for_csv = f'csv_saved/{path_to_run}.csv'
     save_explanations_to_csv(class_wanted, path_for_csv, explanations, num_features)
-
-
-# TODO: next steps
-#  finish above todos in code
-#  add main run functionality for all classes and save explanation results to csv file
-
-# TODO: other options to try along the way...
-#  figure out how to use laptop gpu (see readme for gpu usage) WITH docker??
-#  try WITHOUT DOCKER and get the model and run it
-
-# TODO: end goal
-#  get a csv which has positive+negative features for all classes
-#  visualize the csv results
