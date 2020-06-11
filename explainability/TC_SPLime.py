@@ -99,6 +99,7 @@ def save_explanations_as_figs(sp_obj) -> str:
     index = 0
     for fig in [exp.as_pyplot_figure(label=exp.available_labels()[0]) for exp in sp_obj.sp_explanations]:
         fig_path = f'{path}/fig{index}.png'
+        # Can comment the below line when you don't want figures
         fig.savefig(fig_path)
         index += 1
 
@@ -107,25 +108,28 @@ def save_explanations_as_figs(sp_obj) -> str:
 
 def get_splime_explanations(sp_explanations) -> List[any]:
     print(f'The number of sp_explanations is: {len(sp_explanations)}')
-    classes_explanations = []
+    class1_explanations = []
     for exp in sp_explanations:
         single_explanation = exp.as_list()
-        classes_explanations.append(single_explanation)
         print(single_explanation)
+        print(exp.available_labels())
+        if exp.available_labels()[0] == 1:
+            class1_explanations.append(single_explanation)
+    return class1_explanations
 
-    return classes_explanations
 
-
-def save_explanations_to_csv(csv_path: str, exps, specified_num_features: int):
+def save_explanations_to_csv(focused_class: str, csv_path: str, exps, specified_num_features: int):
     # saves the explanation #, features, and values to a csv file
-    # TODO: figure out how to add the class as a column
     exp_list_for_csv = []
     for index, exp in enumerate(exps):
+        # TODO: get all features on the same row
+        #exp_list_for_csv.append([focused_class, index, exp[feature_index for feature_index in range(specified_num_features)][0],
+                                                           # exp[feature_index for feature_index in range(specified_num_features)][1]])
         for feature_index in range(specified_num_features):
-            exp_list_for_csv.append([index, exp[feature_index][0], exp[feature_index][1]])
+            exp_list_for_csv.append([focused_class, index, exp[feature_index][0], exp[feature_index][1]])
     outfile = open(csv_path, 'w')
     writer = csv.writer(outfile)
-    writer.writerow(["Explanation #", "Feature", "Value"])
+    writer.writerow(["Class", "Explanation #", "Features", "Values"])
     writer.writerows(exp_list_for_csv)
     outfile.close()
 
@@ -168,7 +172,7 @@ def run_splime_for_TC(word_count_max: int, focus_class: str, sp_samples_num: int
     explainer = LimeTextExplainer(class_names=class_names)
 
     print('\nStarting SP-Lime!!!')
-    # TODO: replace easy with get_predicted_labels when ready
+    # TODO: replace easy with model prediction function when ready
     sp_obj = submodular_pick.SubmodularPick(explainer, updated_samples_texts, easy,
                                             sample_size=sp_samples_num, num_features=sp_features_num,
                                             num_exps_desired=sp_explanations_num)
@@ -189,22 +193,23 @@ if __name__ == "__main__":
     # specify parameters
     max_wc = 40
     class_wanted = 'non-citizens'
-    num_samples = 1
-    num_features = 4
-    num_exps = 1
+    num_samples = 1   # try: 100
+    num_features = 4  # try: 10
+    num_exps = 1      # try: 10
 
     explanations, path_to_run = run_splime_for_TC(max_wc, class_wanted, num_samples, num_features, num_exps)
+
     print('\nBack in main function now...')
     print(explanations[0])  # print the features and their values for the first explanation
 
     # save explanation information into csv
+    # TODO: when we want to add a for loop for all labels, save the first path_to_csv so that it can be the same for all
     path_for_csv = f'csv_saved/{path_to_run}.csv'
-    save_explanations_to_csv(path_for_csv, explanations, num_features)
+    save_explanations_to_csv(class_wanted, path_for_csv, explanations, num_features)
 
 
 # TODO: next steps
 #  finish above todos in code
-#  transfer .py file to a google colab file and run
 #  add main run functionality for all classes and save explanation results to csv file
 
 # TODO: other options to try along the way...

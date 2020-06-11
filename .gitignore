@@ -11,3 +11,5 @@ db/*
 .idea
 /updated_data/
 *.ipynb*
+/explainability/csv_saved/
+/explainability/figures_saved/
