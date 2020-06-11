@@ -80,30 +80,27 @@ def easy(texts: List[str]) -> numpy.array:
     return numpy.array(full_predicted_labels)
 
 
-def save_explanations_as_figs(sp_obj) -> str:
-    # define the name of the directory to be created
+def get_run_path() -> str:
     time = datetime.now().strftime("%Y%m%d-%H%M%S%f")
-
     run_num = f'Run_{time}'
-    path = f'figures_saved/{run_num}'
+    return run_num
 
-    # make directory to store the figures
+
+def save_explanations_as_figs(sp_obj, run_path):
+    # define the name of the directory to be created
+    path = f'figures_saved/{run_path}'
     try:
         os.mkdir(path)
     except OSError:
         print("Creation of the directory %s failed" % path)
     else:
         print("Successfully created the directory %s " % path)
-
-    #  stores the figures in the path given
-    index = 0
-    for fig in [exp.as_pyplot_figure(label=exp.available_labels()[0]) for exp in sp_obj.sp_explanations]:
-        fig_path = f'{path}/fig{index}.png'
-        # Can comment the below line when you don't want figures
-        fig.savefig(fig_path)
-        index += 1
-
-    return run_num
+        #  stores the figures in the path given
+        index = 0
+        for fig in [exp.as_pyplot_figure(label=exp.available_labels()[0]) for exp in sp_obj.sp_explanations]:
+            fig_path = f'{path}/fig{index}.png'
+            fig.savefig(fig_path)
+            index += 1
 
 
 def get_splime_explanations(sp_explanations) -> List[any]:
@@ -135,7 +132,7 @@ def save_explanations_to_csv(focused_class: str, csv_path: str, exps, specified_
 
 
 def run_splime_for_TC(word_count_max: int, focus_class: str, sp_samples_num: int,
-                      sp_features_num: int, sp_explanations_num: int):
+                      sp_features_num: int, sp_explanations_num: int, save_figs: bool):
     # load the pkl file
     with open('../updated_data/UHRI_affected_persons.pkl', 'rb') as f:
         data = pickle.load(f)
@@ -180,7 +177,9 @@ def run_splime_for_TC(word_count_max: int, focus_class: str, sp_samples_num: int
     # num_features is maximum number of features present in explanation
     # sample_size is the number of instances to explain
 
-    run_path = save_explanations_as_figs(sp_obj)
+    run_path = get_run_path()
+    if save_figs:
+        save_explanations_as_figs(sp_obj, run_path)
     sp_explanations_list = get_splime_explanations(sp_obj.sp_explanations)
 
     return sp_explanations_list, run_path
@@ -196,8 +195,9 @@ if __name__ == "__main__":
     num_samples = 1   # try: 100
     num_features = 4  # try: 10
     num_exps = 1      # try: 10
+    save_figures = True
 
-    explanations, path_to_run = run_splime_for_TC(max_wc, class_wanted, num_samples, num_features, num_exps)
+    explanations, path_to_run = run_splime_for_TC(max_wc, class_wanted, num_samples, num_features, num_exps, save_figures)
 
     print('\nBack in main function now...')
     print(explanations[0])  # print the features and their values for the first explanation
