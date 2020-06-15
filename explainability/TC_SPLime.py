@@ -107,11 +107,8 @@ def get_splime_explanations(sp_explanations) -> List[any]:
     print(f'The number of sp_explanations is: {len(sp_explanations)}')
     class1_explanations = []
     for exp in sp_explanations:
-        single_explanation = exp.as_list()
-        print(single_explanation)
-        print(exp.available_labels())
         if exp.available_labels()[0] == 1:
-            class1_explanations.append(single_explanation)
+            class1_explanations.append(exp.as_list())
     return class1_explanations
 
 
@@ -120,8 +117,6 @@ def save_explanations_to_csv(focused_class: str, csv_path: str, exps, specified_
     exp_list_for_csv = []
     for index, exp in enumerate(exps):
         # TODO: get all features on the same row
-        #exp_list_for_csv.append([focused_class, index, exp[feature_index for feature_index in range(specified_num_features)][0],
-                                                           # exp[feature_index for feature_index in range(specified_num_features)][1]])
         for feature_index in range(specified_num_features):
             exp_list_for_csv.append([focused_class, index, exp[feature_index][0], exp[feature_index][1]])
     outfile = open(csv_path, 'w')
@@ -169,8 +164,7 @@ def run_splime_for_TC(word_count_max: int, focus_class: str, sp_samples_num: int
     explainer = LimeTextExplainer(class_names=class_names)
 
     print('\nStarting SP-Lime!!!')
-    # TODO: replace dummy function 'easy' with model prediction function when ready
-    sp_obj = submodular_pick.SubmodularPick(explainer, updated_samples_texts, easy,
+    sp_obj = submodular_pick.SubmodularPick(explainer, updated_samples_texts, get_predicted_labels,
                                             sample_size=sp_samples_num, num_features=sp_features_num,
                                             num_exps_desired=sp_explanations_num)
     # num_exps_desired is the number of explanation objects returned per class
@@ -192,9 +186,9 @@ if __name__ == "__main__":
     # specify parameters
     max_wc = 40
     class_wanted = 'non-citizens'
-    num_samples = 1   # try: 100
-    num_features = 4  # try: 10
-    num_exps = 1      # try: 10
+    num_samples = 2
+    num_features = 4
+    num_exps = 2
     save_figures = True
 
     explanations, path_to_run = run_splime_for_TC(max_wc, class_wanted, num_samples, num_features, num_exps, save_figures)
@@ -203,6 +197,5 @@ if __name__ == "__main__":
     print(explanations[0])  # print the features and their values for the first explanation
 
     # save explanation information into csv
-    # TODO: when we want to add a for loop for all labels, save the first path_to_csv so that it can be the same for all
     path_for_csv = f'csv_saved/{path_to_run}.csv'
     save_explanations_to_csv(class_wanted, path_for_csv, explanations, num_features)
